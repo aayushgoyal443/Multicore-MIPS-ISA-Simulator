@@ -41,8 +41,6 @@ loop:
     mflo $t8                    # t8 = (y1+y0)*(x1-x0)
     add $t0,$t0,$t8             # update sum = sum + (y1+y0)*(x1-x0)
 
-    beq $t0, ,overflow          # check overflow in sum
-
     move $t2,$t4                # update x, x0 = x1
     move $t3,$t5                # update y, y0 = y1 
 
@@ -67,8 +65,3 @@ loop_exit:
 
     li $v0,10
     syscall                     # exit the code
-
-overflow:
-
-    li $v0,10
-    syscall                     # exit the code in case of overflow
