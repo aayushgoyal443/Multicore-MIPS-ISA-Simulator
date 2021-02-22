@@ -13,6 +13,11 @@ main:
     syscall
     move $t1,$v0                # t1 = n, the total number of points
 
+    addi $t1,$t1,-1             # because we have to do only n-1 iterations to get the desired result.
+    slt $t9,$t1,$zero
+    bne $t9,$zero, n_error
+    # assert: n>=0
+
     li $v0,5
     syscall
     move $t2,$v0                # t2 = x0
@@ -20,8 +25,6 @@ main:
     li $v0,5
     syscall
     move $t3,$v0                # t3 = y0
-
-    addi $t1,$t1,-1             # because we have to do only n-1 iterations to get the desired result.
 
 loop:
     beq $t1,$zero,loop_exit     # When the value of n becomes 0 we exit the loop (by jumping to loop_exit)
@@ -48,8 +51,18 @@ loop:
     addi $t1,$t1,-1             
 
     # jump back and check whether the loop is to be executed again or not, accordingly do the needful
-    j loop                   
+    j loop        
 
+# We will jump to n_error when the input value of n<=0
+n_error:
+    li $v0,4
+    la $a0, n_error_msg
+    syscall
+
+    li $v0,10
+    syscall                     # exit the code
+
+# We have successfully executed our loop
 loop_exit:
 
     mtc1 $t0, $f1
@@ -65,3 +78,6 @@ loop_exit:
 
     li $v0,10
     syscall                     # exit the code
+
+.data
+n_error_msg: .asciiz "\nInvalid value of n, it should be greater than 0\n"
