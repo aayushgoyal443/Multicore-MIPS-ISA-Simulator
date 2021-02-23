@@ -14,7 +14,7 @@ main:
     move $s1,$v0                # s1 = n, the total number of points
 
     addi $s1,$s1,-1             # because we have to do only n-1 iterations to get the desired result.
-    slt $t0,$s1,$zero
+    slt $t0,$s1,$zero           # t0=0 if s1>=0
     bne $t0,$zero, n_error
     # assert: n>=0
 
@@ -32,6 +32,10 @@ loop:
     li $v0,5
     syscall
     move $s4,$v0                # s4 = x1
+
+    slt $t4,$s4,$s2             #t4 is 0 if s4>=s2
+    bne $t4,$zero,not_sorted
+    # assert: s4>=s2
 
     li $v0,5
     syscall
@@ -62,6 +66,15 @@ n_error:
     li $v0,10
     syscall                     # exit the code
 
+# We will jump to not_sorted when x-coordinates are not in non-decreasing order
+not_sorted:
+    li $v0,4
+    la $a0, not_sorted_msg
+    syscall
+
+    li $v0,10
+    syscall                     # exit the code
+
 # We have successfully executed our loop
 loop_exit:
 
@@ -81,3 +94,4 @@ loop_exit:
 
 .data
 n_error_msg: .asciiz "\nInvalid value of n, it should be greater than 0\n"
+not_sorted_msg: .asciiz "\nInvalid input, provide x-coordinates in non-decreasing order\n"
