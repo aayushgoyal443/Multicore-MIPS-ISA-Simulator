@@ -5,50 +5,50 @@
 
 main:
 
-    # t0 = sum, intialized to 0, which will store the value sigma(i=1 to n)(y_i + y_i-1)(x_i - x_i-1) after i iterations. 
+    # s0 = sum, intialized to 0, which will store the value sigma(i=1 to n)(y_i + y_i-1)(x_i - x_i-1) after i iterations. 
     # The actual area is half of this sum value.
-    li $t0,0                
+    li $s0,0                
 
     li $v0,5
     syscall
-    move $t1,$v0                # t1 = n, the total number of points
+    move $s1,$v0                # s1 = n, the total number of points
 
-    addi $t1,$t1,-1             # because we have to do only n-1 iterations to get the desired result.
-    slt $t9,$t1,$zero
-    bne $t9,$zero, n_error
+    addi $s1,$s1,-1             # because we have to do only n-1 iterations to get the desired result.
+    slt $t0,$s1,$zero
+    bne $t0,$zero, n_error
     # assert: n>=0
 
     li $v0,5
     syscall
-    move $t2,$v0                # t2 = x0
+    move $s2,$v0                # s2 = x0
 
     li $v0,5
     syscall
-    move $t3,$v0                # t3 = y0
+    move $s3,$v0                # s3 = y0
 
 loop:
-    beq $t1,$zero,loop_exit     # When the value of n becomes 0 we exit the loop (by jumping to loop_exit)
+    beq $s1,$zero,loop_exit     # When the value of n becomes 0 we exit the loop (by jumping to loop_exit)
 
     li $v0,5
     syscall
-    move $t4,$v0                # t4 = x1
+    move $s4,$v0                # s4 = x1
 
     li $v0,5
     syscall
-    move $t5,$v0                # t5 = y1
+    move $s5,$v0                # s5 = y1
 
-    sub $t6,$t4,$t2             # t6 = x1-x0
-    add $t7,$t5,$t3             # t7 = y1+y0
+    sub $t1,$s4,$s2             # t1 = x1-x0
+    add $t2,$s5,$s3             # t2 = y1+y0
 
-    mult $t6,$t7    
-    mflo $t8                    # t8 = (y1+y0)*(x1-x0)
-    add $t0,$t0,$t8             # update sum = sum + (y1+y0)*(x1-x0)
+    mult $t1,$t2    
+    mflo $t3                    # t3 = (y1+y0)*(x1-x0)
+    add $s0,$s0,$t3             # update sum = sum + (y1+y0)*(x1-x0)
 
-    move $t2,$t4                # update x, x0 = x1
-    move $t3,$t5                # update y, y0 = y1 
+    move $s2,$s4                # update x, x0 = x1
+    move $s3,$s5                # update y, y0 = y1 
 
     # decrement the value of 'n' else we will be stuck in an infinite loop
-    addi $t1,$t1,-1             
+    addi $s1,$s1,-1             
 
     # jump back and check whether the loop is to be executed again or not, accordingly do the needful
     j loop        
@@ -65,7 +65,7 @@ n_error:
 # We have successfully executed our loop
 loop_exit:
 
-    mtc1 $t0, $f1
+    mtc1 $s0, $f1
     cvt.s.w $f1, $f1            # Converted the integer sum into a float value, f1 = sum
 
     li.s $f2, 2.0;              # f2 = 2.0
