@@ -22,30 +22,32 @@ main:
 
 loop:
 
+    li $t9,10
     lb $s2,($s1)
-    beq $s2,$zero,loop_exit
+    beq $s2,$t9,loop_exit
 
     beq $s2,$s5,multiply
     beq $s2,$s6,addition
     beq $s2,$s7,subtraction
 
-    # slt $t4,$s2,$s3
-    # bne $t4,$zero,char_error
-    # sgt $t4,$s2,$s4
-    # bne $t4,$zero,char_error
+    slt $t4,$s2,$s3
+    bne $t4,$zero,char_error
+    sgt $t4,$s2,$s4
+    bne $t4,$zero,char_error
 
     addi $s2,$s2,-48
     addi $sp,$sp,-4
-    sw $s2,($sp)
-    addi $s0,$s0,1
+    sw $s2, ($sp)    
 
+    addi $s0,$s0,1
     addi $s1,$s1,1
+
     j loop
 
 multiply:
+
     slti $t0,$s0,2
     bne $t0,$zero,exp_error
-    addi $s0,$s0,-1
 
     lw $t1,($sp)
     lw $t2,4($sp)
@@ -55,34 +57,45 @@ multiply:
     mflo $t3
 
     sw $t3,($sp)
+
+    addi $s1,$s1,1
+    addi $s0,$s0,-1
     j loop					
 
 
 addition:
+
     slti $t0,$s0,2
     bne $t0,$zero,exp_error
-    addi $s0,$s0,-1
 
     lw $t1,($sp)
     lw $t2,4($sp)
     addi $sp,$sp,4
 
     add	$t3, $t1, $t2
+
     sw $t3,($sp)
+
+    addi $s0,$s0,-1
+    addi $s1,$s1,1
     j loop
 
 subtraction:
+
     slti $t0,$s0,2
     bne $t0,$zero,exp_error
-    addi $s0,$s0,-1
-
+    
     lw $t1,($sp)
     lw $t2,4($sp)
     addi $sp,$sp,4
 
     sub	$t3, $t2, $t1
+    
     sw $t3,($sp)
-    j loop
+
+    addi $s0,$s0,-1
+    addi $s1,$s1,1
+    j loop    
 
 char_error:
 
@@ -104,15 +117,16 @@ exp_error:
 
 loop_exit:
 
-    li $t5,2
+    li $t5,1
     bne	$s0,$t5,exp_error
 
     li $v0,1
-    lw $a0,($sp)
+    lw $a0, ($sp)
     syscall
 
     li $v0,10
     syscall
+
 
 .data
 buffer: .space 52
