@@ -1,3 +1,7 @@
+# This code has been designed by :
+# 1) Shrey Patel (2019CS10400)
+# 2) Aayush Goyal (2019CS10452)
+
 # Assembly program to evaluate postfix expression
 
 .text
