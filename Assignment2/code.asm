@@ -10,19 +10,7 @@
 main:
            
     #current size of stack
-    li $s0,0      
-
-    #Taking string as input, v0=8 is used for inputting string at syscall
-    li $v0,8       
-
-    # Allocating maximum space to string, which is 52 characters
-    # a0 stores the input string, a1 stores the length of the string
-    la $a0,buffer
-    li $a1,52      
-    syscall
-
-    #Copying the string onto a global variable s1, so s1 is the string iterator
-    move $s1,$a0  
+    li $s0,0        
 
     #ASCII values for permissible character
     li $s3,48   # 0
@@ -32,6 +20,18 @@ main:
     li $s7,45   # -
 
 loop:
+
+    #Taking string as input, v0=8 is used for inputting string at syscall
+    li $v0,8       
+
+    # Allocating maximum space to string, which is 52 characters
+    # a0 stores the input string, a1 stores the length of the string
+    la $a0,buffer
+    li $a1,2      
+    syscall
+
+    #Copying the string onto a global variable s1, so s1 is the string iterator
+    move $s1,$a0
 
     # Exit condition of the loop: The loop is exited once the user presses "Enter" key
     li $t9,10
@@ -57,7 +57,7 @@ loop:
     sw $s2, ($sp)    
 
     addi $s0,$s0,1      # Increasing the size of stack by 1 
-    addi $s1,$s1,1      # # Increasing the string iterator by 1
+    #addi $s1,$s1,1      # # Increasing the string iterator by 1
 
     j loop              #Jumping back to the loop
 
@@ -78,7 +78,7 @@ multiply:
     sw $t3,($sp)
 
     # Increasing the string iterator by 1
-    addi $s1,$s1,1
+    #addi $s1,$s1,1
     #Updating the size of the stack(decreased by 1)
     addi $s0,$s0,-1
 
@@ -103,7 +103,7 @@ addition:
     # Updating the size of the stack(decreased by 1)
     addi $s0,$s0,-1
     # Increasing the string iterator by 1
-    addi $s1,$s1,1
+    #addi $s1,$s1,1
 
     j loop              #Jumping back to the loop              
 
@@ -125,7 +125,7 @@ subtraction:
     #Updating the size of the stack(decreased by 1)
     addi $s0,$s0,-1
     # Increasing the string iterator by 1
-    addi $s1,$s1,1
+    #addi $s1,$s1,1
     j loop    
 
 # Raising error in case an invalid character is entered
@@ -179,8 +179,8 @@ loop_exit:
 
 #Error messages to be printed on console
 .data
-buffer: .space 52
-error: .asciiz "Invalid character\n"
-error2: .asciiz "Invalid expression\n"
+buffer: .space 2
+error: .asciiz "\nInvalid character\n"
+error2: .asciiz "\nInvalid expression\n"
 error3: .asciiz "Empty expression\n"
 newline: .asciiz "\n"
