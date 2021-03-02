@@ -57,7 +57,6 @@ loop:
     sw $s2, ($sp)    
 
     addi $s0,$s0,1      # Increasing the size of stack by 1 
-    #addi $s1,$s1,1      # # Increasing the string iterator by 1
 
     j loop              #Jumping back to the loop
 
@@ -77,8 +76,6 @@ multiply:
     mflo $t3
     sw $t3,($sp)
 
-    # Increasing the string iterator by 1
-    #addi $s1,$s1,1
     #Updating the size of the stack(decreased by 1)
     addi $s0,$s0,-1
 
@@ -102,8 +99,6 @@ addition:
 
     # Updating the size of the stack(decreased by 1)
     addi $s0,$s0,-1
-    # Increasing the string iterator by 1
-    #addi $s1,$s1,1
 
     j loop              #Jumping back to the loop              
 
@@ -124,8 +119,7 @@ subtraction:
 
     #Updating the size of the stack(decreased by 1)
     addi $s0,$s0,-1
-    # Increasing the string iterator by 1
-    #addi $s1,$s1,1
+    
     j loop    
 
 # Raising error in case an invalid character is entered
