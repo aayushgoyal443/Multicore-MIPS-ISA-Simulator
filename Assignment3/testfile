@@ -1,9 +1,3 @@
-This file 
-will be 
-split 
-into lines
-to know 
-if the 
-file 
-is 
-working!
+li t1 5
+li t2 6
+add t3 t1 t2
