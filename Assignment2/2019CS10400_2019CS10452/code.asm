@@ -27,7 +27,7 @@ loop:
     # Allocating maximum space to string, which is 52 characters
     # a0 stores the input string, a1 stores the length of the string
     la $a0,buffer
-    li $a1,2      
+    li $a1,1      
     syscall
 
     #Copying the string onto a global variable s1, so s1 is the string iterator
@@ -173,7 +173,7 @@ loop_exit:
 
 #Error messages to be printed on console
 .data
-buffer: .space 2
+buffer: .space 1
 error: .asciiz "\nInvalid character\n"
 error2: .asciiz "\nInvalid expression\n"
 error3: .asciiz "Empty expression\n"
