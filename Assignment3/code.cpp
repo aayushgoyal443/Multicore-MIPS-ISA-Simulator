@@ -8,6 +8,15 @@ map<string,int> labels;
 map<string,string> variables;
 vector<string> instructions;
 int itr = 0;
+int throwError = 0;
+
+string int_to_hex( int x){
+	string s ="";
+	while(x!=0){
+		int r= x%16;
+		if (r>=0 && )
+	}
+}
 
 void printRegisters(){
 	for (auto i: registers){
@@ -46,7 +55,7 @@ void fillRegs(){
 	registers["k0"]=0;
 	registers["k1"]=0;
 	registers["gp"]=0;
-	registers["sp"]=0;
+	registers["sp"]=2147479548;
 	registers["ra"]=0;
 }
 
@@ -55,12 +64,12 @@ void fillOpers()
 	operations["add"]=0;
 	operations["sub"]=0;
 	operations["mul"]=0;
-	operations["mflo"]=0;  
 	operations["beq"]=0;
 	operations["bne"]=0;
 	operations["slt"]=0;
 	operations["j"]=0;
-	operations["li"]=0;	
+	operations["li"]=0; 
+	operations["lw"]=0;
 	operations["sw"]=0;
 	operations["addi"]=0;
 }
@@ -69,7 +78,8 @@ void process(vector<string> tokens){
 	int m=tokens.size();
 	string s=tokens[0];
 	if(m>4){
-		cout<<"Error";
+		cout<<"Syntax Error\n";
+		throwError =1;
 		return;
 	}
 	else{
@@ -79,21 +89,7 @@ void process(vector<string> tokens){
 			}else if(s=="sub"){
 				registers[tokens[1]]=registers[tokens[2]]-registers[tokens[3]];
 			}else if(s=="mul"){
-				int prod=registers[tokens[1]]*registers[tokens[2]];
-				string currentLine = instructions[++itr];
-				istringstream f(currentLine);
-				vector<string> strings;
-				string c;
-				while(getline(f,c,' ')){
-					strings.push_back(c);		
-				}
-				int n = strings.size();
-				if(n==2){
-					if(strings[0]=="mflo"){
-						registers[strings[1]]=prod;
-						operations["mflo"]++;
-					}
-				}
+				registers[tokens[1]]=registers[tokens[2]]*registers[tokens[3]];
 			}else if(s=="beq"){
 				if(registers[tokens[1]]==registers[tokens[2]]){
 					itr = labels[tokens[3]];
@@ -103,7 +99,7 @@ void process(vector<string> tokens){
 					itr = labels[tokens[3]];
 				}
 			}else if(s=="slt"){
-				if(tokens[2]<tokens[3]){
+				if(registers[tokens[2]]<registers[tokens[2]]){
 					registers[tokens[1]]=1;
 				}else{
 					registers[tokens[1]]=0;
