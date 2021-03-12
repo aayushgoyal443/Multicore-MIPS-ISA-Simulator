@@ -87,114 +87,172 @@ void process(vector<string> tokens){
 		return;
 	}
 	else{
-		if(operations.find(s0)!=operations.end()){
-			if(m==2){
-				string s1=tokens[1];
-				if(labels.find(s1)!=labels.end()){
-					if(s0=="j"){
-						itr=labels[s1];
+		if(m!=1){
+			if(operations.find(s0)!=operations.end()){
+				if(m==2){
+					string s1=tokens[1];
+					if(labels.find(s1)!=labels.end()){
+						if(s0=="j"){
+							itr=labels[s1];
+						}
+					}else{
+						cout<<"Invalid register"<<endl;
+						throwError=1;
+						return;
 					}
-				}else{
-					cout<<"Invalid register"<<endl;
-					throwError=1;
-					return;
-				}
-			}else if(m==3){
-				string s1=tokens[1];
-				string s2=tokens[2];
-				if(s0=="lw"){
-					registers[s1]=stoi(variables[s2]);
-				}else if(s0=="sw"){
-					return; 		 //edit
-				}else{
-					registers[s1]=stoi(s2);
-				}
-			}else if(m==4){
-				string s1=tokens[1];
-				string s2=tokens[2];
-				string s3=tokens[3];
-				if(registers.find(s1)!=registers.end() && registers.find(s2)!=registers.end()){
-					if(s0=="add"){
-						if(registers.find(s3)!=registers.end()){
-							registers[s1]=registers[s2]+registers[s3];
-						}else{
-							cout<<"Invalid register\n";
-							throwError=1;
-							return;
-						}
-					}else if(s0=="sub"){
-						if(registers.find(s3)!=registers.end()){
-							registers[s1]=registers[s2]-registers[s3];
-						}else{
-							cout<<"Invalid register\n";
-							throwError=1;
-							return;
-						}
-					}else if(s0=="mul"){
-						if(registers.find(s3)!=registers.end()){
-							registers[s1]=registers[s2]*registers[s3];
-						}else{
-							cout<<"Invalid register\n";
-							throwError=1;
-							return;
-						}
-					}else if(s0=="slt"){
-						if(registers.find(s3)!=registers.end()){
-							if(registers[s2]<registers[s3]){
-								registers[s1]=1;
+				}else if(m==3){
+					string s1=tokens[1];
+					string s2=tokens[2];
+					if(s0=="lw"){
+						registers[s1]=stoi(variables[s2]);
+					}else if(s0=="sw"){
+						return; 		 //edit
+					}else{
+						registers[s1]=stoi(s2);			//li
+					}
+				}else if(m==4){
+					string s1=tokens[1];
+					string s2=tokens[2];
+					string s3=tokens[3];
+					if(registers.find(s1)!=registers.end() && registers.find(s2)!=registers.end()){
+						if(s0=="add"){
+							if(registers.find(s3)!=registers.end()){
+								registers[s1]=registers[s2]+registers[s3];
 							}else{
-								registers[s1]=0;
-							}
-						}else{
-							cout<<"Invalid register\n";
-							throwError=1;
-							return;
-						}
-					}else if(s0=="addi"){
-						if(check_number(s3)){
-							registers[s1]=registers[s2]+stoi(s3);
-						}else{
-							cout<<"Immediate value is not an integer\n";
-							throwError=1;
-							return;
-						}
-					}else if(s0=="beq"){
-						if(registers[s1]==registers[s2]){
-							if(labels.find(s3)!=labels.end()){
-								itr=labels[s3];
-							}else{
-								cout<<"Invalid label\n";
+								cout<<"Invalid register\n";
 								throwError=1;
 								return;
 							}
-						}
-					}else if(s0=="bne"){
-						if(registers[s1]!=registers[s2]){
-							if(labels.find(s3)!=labels.end()){
-								itr=labels[s3];
+						}else if(s0=="sub"){
+							if(registers.find(s3)!=registers.end()){
+								registers[s1]=registers[s2]-registers[s3];
 							}else{
-								cout<<"Invalid label\n";
+								cout<<"Invalid register\n";
 								throwError=1;
 								return;
 							}
+						}else if(s0=="mul"){
+							if(registers.find(s3)!=registers.end()){
+								registers[s1]=registers[s2]*registers[s3];
+							}else{
+								cout<<"Invalid register\n";
+								throwError=1;
+								return;
+							}
+						}else if(s0=="slt"){
+							if(registers.find(s3)!=registers.end()){
+								if(registers[s2]<registers[s3]){
+									registers[s1]=1;
+								}else{
+									registers[s1]=0;
+								}
+							}else{
+								cout<<"Invalid register\n";
+								throwError=1;
+								return;
+							}
+						}else if(s0=="addi"){
+							if(check_number(s3)){
+								registers[s1]=registers[s2]+stoi(s3);
+							}else{
+								cout<<"Immediate value is not an integer\n";
+								throwError=1;
+								return;
+							}
+						}else if(s0=="beq"){
+							if(registers[s1]==registers[s2]){
+								if(labels.find(s3)!=labels.end()){
+									itr=labels[s3];
+								}else{
+									cout<<"Invalid label\n";
+									throwError=1;
+									return;
+								}
+							}
+						}else if(s0=="bne"){
+							if(registers[s1]!=registers[s2]){
+								if(labels.find(s3)!=labels.end()){
+									itr=labels[s3];
+								}else{
+									cout<<"Invalid label\n";
+									throwError=1;
+									return;
+								}
+							}
 						}
+					}else{
+						cout<<"Invalid register\n";
+						throwError=1;
+						return;
 					}
-				}else{
-					cout<<"Invalid register\n";
-					throwError=1;
-					return;
 				}
-			}
-			itr++;
-			if(m!=1){
-				operations[s0]++;
+				itr++;
+				if(m!=1){
+					operations[s0]++;
+				}
+			}else{
+				cout<<"Invalid Instruction "<<itr<<endl;
+				throwError=1;
+				return;
 			}
 		}else{
-			cout<<"Invalid Instruction"<<endl;
-			throwError=1;
-			return;
+			itr++;
 		}
 	}
+}
+
+vector<string> split(string line){
+	int n=line.length();
+	vector<string> v;
+	bool first=false;
+	bool second=false;
+	string s="";
+	int i=0;
+	while(i<n){
+		if(first){
+			if(second){
+				if(line[i]==','){
+					v.push_back(s);
+					s="";
+					i++;
+					while(line[i]==' ' || line[i]=='\t'){
+						if(i<n){
+							i++;
+						}else{
+							break;
+						}
+					}
+				}else{
+					s+=line[i];
+					i++;
+				}
+			}else{
+				if(line[i]==' '||line[i]=='\t'){
+					second=true;
+					v.push_back(s);
+					s="";
+					while(line[i]==' ' || line[i]=='\t'){
+						if(i<n){
+							i++;
+						}else{
+							break;
+						}
+					}
+				}else{
+					s+=line[i];
+					i++;    
+				}
+			}
+		}else{
+			if(line[i]!=' ' && line[i]!='\t'){
+				first=true;
+				s+=line[i];
+			}
+			i++;
+		}
+	}
+	v.push_back(s);
+	return v;
 }
 
 int main(int argc, char** argv)
@@ -215,29 +273,38 @@ int main(int argc, char** argv)
 
 	for(int i=0;i<n;i++){
 		string currentLine = instructions[i];
-		istringstream f(currentLine);
 		vector<string> strings;
-		string c;
 
-		while(getline(f,c,' ')){
-			strings.push_back(c);		
-		}
+		strings=split(currentLine);
 
 		if(strings.size()==1){
+			int l=strings[0].size();
+			if(strings[0][l-1]==':'){
+				labels[strings[0].substr(0,l-1)]=i;
+			}else{
+				cout<<"Colon required at the end of label at line "<<i<<endl;
+				throwError=1;
+				return 0;
+			}
+		}
+
+		if(strings.size()==2 && strings[1]==":"){
 			labels[strings[0]]=i;
+			instructions[i]=strings[0]+":";
 		}
 	}
 
 	while(itr<n){
 		string currentLine = instructions[itr];
-		istringstream f(currentLine);
+		//istringstream f(currentLine);
 		vector<string> strings;
-		string c;
+		//string c;
 
-		while(getline(f,c,' ')){
-			strings.push_back(c);		
-		}
+		// while(getline(f,c,' ')){
+		// 	strings.push_back(c);		
+		// }
 
+		strings=split(currentLine);
 		process(strings);
 		if(throwError==1){
 			return 0;
