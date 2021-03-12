@@ -10,6 +10,49 @@ vector<string> instructions;
 int itr = 0;
 int throwError = 0;
 
+
+string int_to_hex(int n){
+	string binary;
+	int np = abs(n);
+	for (int i=0;i<32;i++){
+		binary += '0';
+	}
+	int i=31;
+	while(np!=0){
+		if (np%2==1) binary[i] = '1';
+		np/=2;
+		i--;
+	}
+	i=31;
+	while(n<0 && i>=0){
+		if (binary[i]=='0') binary[i] = '1';
+		else binary[i] = '0';
+		i--;
+	}
+	i=31;
+	while(n<0 && i>=0){
+		if (binary[i]=='0'){
+			binary[i]='1';
+			break;
+		}
+		else{
+			binary[i] = '0';
+			i--;
+		}
+	}
+	string hex;
+	for (int i=0;i<8;i++){
+		int val=0;
+		val = (binary[31-4*i]-'0')+(binary[31-4*i-1]-'0')*2+(binary[31-4*i-2]-'0')*4+(binary[31-4*i-3]-'0')*8;
+		if (val>=0 && val<=9) hex = char('0'+val) + hex;
+		else{
+			hex = char('a'+val-10) + hex;
+		}
+	}
+
+	return hex;
+}
+
 bool check_number(string str) {
    	if(!isdigit(str[0])){
 	   	if(str[0]!='-' && str[0]!='+'){
@@ -24,7 +67,7 @@ bool check_number(string str) {
 
 void printRegisters(){
 	for (auto i: registers){
-		cout<<(i.first).substr(1)<<": "<<i.second<<endl;
+		cout<<(i.first).substr(1)<<": "<<int_to_hex(i.second)<<endl;
 	}
 	cout<<"\n";
 }
