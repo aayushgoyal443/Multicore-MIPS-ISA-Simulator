@@ -1,3 +1,10 @@
-li t1 5
-li t2 6
-add t3 t1 t2
+add s1,s2,s3
+li s2,2
+
+loop: 
+    add
+    bne  loop_exit:
+    j loop
+
+loop_exit:
+    add

@@ -2,18 +2,30 @@
 #include<fstream>
 using namespace std;
 
-void printRegisters(unordered_map<string,int> registers){
+map<string,int> registers;
+map<string,int> operations;
+map<string,int> labels;
+int itr = 0;
+
+void printRegisters(){
 	for (auto i: registers){
 		cout<<i.first<<": "<<i.second<<endl;
 	}
 	cout<<"\n";
 }
 
-void fill(unordered_map<string,int> &registers){
-	registers.insert(make_pair("r0",0));
-	registers.insert(make_pair("at",0));
-	registers.insert(make_pair("v0",0));
-	registers.insert(make_pair("v1",0));
+void printOperations(){
+	for (auto i: operations){
+		cout<<i.first<<": "<<i.second<<endl;
+	}
+	cout<<"\n";
+}
+
+void fillRegs(){
+	registers["r0"]=0;
+	registers["at"]=0;
+	registers["v0"]=0;
+	registers["v1"]=0;
 	
 	string c;
 	int m;
@@ -25,33 +37,33 @@ void fill(unordered_map<string,int> &registers){
 			case 2: {c="s";m=9;break;}
 		}
 		for(int j=0;j<m;j++){
-			registers.insert(make_pair(c+to_string(j),0));
+			registers[c+to_string(j)]=0;
 		}
 	}
 	
-	registers.insert(make_pair("k0",0));
-	registers.insert(make_pair("k1",0));
-	registers.insert(make_pair("gp",0));
-	registers.insert(make_pair("sp",0));
-	registers.insert(make_pair("ra",0));
+	registers["k0"]=0;
+	registers["k1"]=0;
+	registers["gp"]=0;
+	registers["sp"]=0;
+	registers["ra"]=0;
 }
 
-void fill2(unordered_map<string,int> &operations)
+void fillOpers()
 {
-	operations.insert(make_pair("add",0));
-	operations.insert(make_pair("sub",0));
-	operations.insert(make_pair("mul",0));
-	operations.insert(make_pair("mflo",0));
-	operations.insert(make_pair("beq",0));
-	operations.insert(make_pair("bne",0));
-	operations.insert(make_pair("slt",0));
-	operations.insert(make_pair("j",0));
-	operations.insert(make_pair("li",0));
-	operations.insert(make_pair("sw",0));
-	operations.insert(make_pair("addi",0));
+	operations["add"]=0;
+	operations["sub"]=0;
+	operations["mul"]=0;
+	operations["mflo"]=0;  
+	operations["beq"]=0;
+	operations["bne"]=0;
+	operations["slt"]=0;
+	operations["j"]=0;
+	operations["li"]=0;	
+	operations["sw"]=0;
+	operations["addi"]=0;
 }
 
-void process(vector<string> tokens,unordered_map<string,int> &registers,unordered_map<string,int> &operations){
+void process(vector<string> tokens){
 	int m=tokens.size();
 	if(m==4){
 		if(tokens[0]=="add"){
@@ -66,39 +78,35 @@ void process(vector<string> tokens,unordered_map<string,int> &registers,unordere
 int main(int argc, char** argv)
 {
 	string fileName = argv[1];
-    	vector<string> instructions;
-    	ifstream myFile(fileName);
-    	string line;
-    	int clockCycles=0;
-    	unordered_map<string,int> registers;
-		unordered_map<string,int> operations;
-    	fill(registers);
-		fill2(operations);
-    
-    	while(getline(myFile,line)){
-    		instructions.push_back(line);
-    	}
-    	int n=instructions.size();
-    
-    	for(int i=0;i<n;i++){
-    		string currentLine = instructions[i];
-			istringstream f(currentLine);
-			vector<string> strings;
-			string c;
+	vector<string> instructions;
+	ifstream myFile(fileName);
+	string line;
+	int clockCycles=0;
+	fillRegs();
+	fillOpers();
 
-			while(getline(f,c,' ')){
-				strings.push_back(c);
-			}
+	while(getline(myFile,line)){
+		instructions.push_back(line);
+	}
+	int n=instructions.size();
 
-			process(strings,registers,operations);
+	while(itr<n){
+		string currentLine = instructions[itr];
+		istringstream f(currentLine);
+		vector<string> strings;
+		string c;
 
-    	
-    		clockCycles++;
-    		printRegisters(registers);
-			printRegisters(operations);
-    	}
+		while(getline(f,c,' ')){
+			strings.push_back(c);		
+		}
 
-    	cout<<"No. of clock cycles: "<<clockCycles<<endl;
-    
-    	return 0;
+		process(strings);
+		clockCycles++;
+		printRegisters();
+	}
+
+	printOperations();
+	cout<<"No. of clock cycles: "<<clockCycles<<endl;
+
+	return 0;
 }
