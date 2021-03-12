@@ -149,7 +149,9 @@ int main(int argc, char** argv)
 	fillOpers();
 
 	while(getline(myFile,line)){
-		instructions.push_back(line);
+		if(line!=""){
+			instructions.push_back(line);
+		}
 	}
 	int n=instructions.size();
 

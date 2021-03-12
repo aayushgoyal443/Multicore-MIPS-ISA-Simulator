@@ -1,9 +1,12 @@
 li s0 0
 li s1 4
+
 loop
-addi s2 s2 2
+
+            addi s2 s2 2 //instruction
 beq s0 s1 loop_exit
 addi s0 s0 1
 j loop
+
 loop_exit
 li s3 1
