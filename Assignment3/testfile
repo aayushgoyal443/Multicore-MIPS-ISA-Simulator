@@ -1,10 +1,9 @@
-add s1,s2,s3
-li s2,2
-
-loop: 
-    add
-    bne  loop_exit:
-    j loop
-
-loop_exit:
-    add
+li s0 0
+li s1 4
+loop
+addi s2 s2 2
+beq s0 s1 loop_exit
+addi s0 s0 1
+j loop
+loop_exit
+li s3 1
