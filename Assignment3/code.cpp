@@ -266,7 +266,7 @@ vector<string> split(string line){
 						}
 					}
 				}else{
-					s+=line[i];
+					if (line[i]!=' ' && line[i]!='\t') s+=line[i];
 					i++;
 				}
 			}else{
@@ -294,7 +294,7 @@ vector<string> split(string line){
 			i++;
 		}
 	}
-	v.push_back(s);
+	if (s!="") v.push_back(s);
 	return v;
 }
 
@@ -308,7 +308,9 @@ int main(int argc, char** argv)
 	fillOpers();
 
 	while(getline(myFile,line)){
-		if(line!=""){
+		vector <string> strings;
+		strings = split(line);
+		if(strings.size()!=0){
 			instructions.push_back(line);
 		}
 	}
