@@ -1,4 +1,4 @@
-lw $s0,23
+lw $s0,24
 li $s1,4
 
 loop:
