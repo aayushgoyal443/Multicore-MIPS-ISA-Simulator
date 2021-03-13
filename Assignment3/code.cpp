@@ -9,6 +9,7 @@ int memory[1<<18] = {0};
 vector<string> instructions;
 int itr = 0;
 int throwError = 0;
+int newlines = 0;
 
 string int_to_hex(int n){
 	string binary;
@@ -95,7 +96,7 @@ int locateAddress(string reg){
 		addr=stoi(reg);
 	}else{
 		int num=0;
-		string first = reg.substr(0,n-5);
+		string first = reg.substr(0,n-4);
 		string second = reg.substr(n-4,3);
 		if(first!=""){
 			num = stoi(first);
@@ -173,7 +174,7 @@ void parser(vector<string> tokens){
 	int m=tokens.size();
 	string s0=tokens[0];
 	if(m>4){
-		cout<<"Syntax Error\n";
+		cout<<"Syntax Error on line "<<++itr<<endl;
 		throwError =1;
 		return;
 	}
@@ -187,7 +188,7 @@ void parser(vector<string> tokens){
 							itr=labels[s1];
 						}
 					}else{
-						cout<<"Invalid register"<<endl;
+						cout<<"Invalid label on line "<<++itr<<endl;
 						throwError=1;
 						return;
 					}
@@ -195,36 +196,42 @@ void parser(vector<string> tokens){
 					string s1=tokens[1];
 					string s2=tokens[2];
 					if(registers.find(s1)==registers.end()){
-						cout<<"Invalid register\n";
+						cout<<"Invalid register on line "<<++itr<<endl;
 						throwError=1;
 						return;
 					}
 					if(s0=="li"){
 						if(!check_number(s2)){
-							cout<<"Please provide a number as a second argument in li"<<endl;
+							cout<<"Please provide a number as a second argument on line "<<++itr<<endl;
 							throwError=1;
 							return;
 						}
 						registers[s1]=stoi(s2);
 					}else{
 						if(!checkReg(s2)){
-							cout<<"Invalid format of memory address."<<endl;
+							cout<<"Invalid format of memory address on line "<<++itr<<endl;
+							throwError = 1;
+							return;
 						}
 						int address=locateAddress(s2);
 						if(s0=="lw"){
 							if(address<0){
-								cout<<"Unaligned memory address."<<endl;
+								cout<<"Unaligned memory address on "<<++itr<<endl;
+								throwError = 1;
+								return;
 							}else{
 								registers[s1]=memory[address];
 							}
 						}else if(s0=="sw"){
 							if(address<0){
-								cout<<"Unaligned memory address."<<endl;
+								cout<<"Unaligned memory address on "<<++itr<<endl;
+								throwError = 1;
+								return;
 							}else{
 								memory[address]=registers[s1];
 							}		
 						}else{
-							cout<<"Invalid instruction\n";
+							cout<<"Invalid instruction on line"<<++itr<<endl;
 							throwError=1;
 							return;
 						}
@@ -238,7 +245,7 @@ void parser(vector<string> tokens){
 							if(registers.find(s3)!=registers.end()){
 								registers[s1]=registers[s2]+registers[s3];
 							}else{
-								cout<<"Invalid register\n";
+								cout<<"Invalid register on line "<<++itr<<endl;
 								throwError=1;
 								return;
 							}
@@ -246,7 +253,7 @@ void parser(vector<string> tokens){
 							if(registers.find(s3)!=registers.end()){
 								registers[s1]=registers[s2]-registers[s3];
 							}else{
-								cout<<"Invalid register\n";
+								cout<<"Invalid register on line "<<++itr<<endl;
 								throwError=1;
 								return;
 							}
@@ -254,7 +261,7 @@ void parser(vector<string> tokens){
 							if(registers.find(s3)!=registers.end()){
 								registers[s1]=registers[s2]*registers[s3];
 							}else{
-								cout<<"Invalid register\n";
+								cout<<"Invalid register on line "<<++itr<<endl;
 								throwError=1;
 								return;
 							}
@@ -266,7 +273,7 @@ void parser(vector<string> tokens){
 									registers[s1]=0;
 								}
 							}else{
-								cout<<"Invalid register\n";
+								cout<<"Invalid register on line "<<++itr<<endl;
 								throwError=1;
 								return;
 							}
@@ -274,7 +281,7 @@ void parser(vector<string> tokens){
 							if(check_number(s3)){
 								registers[s1]=registers[s2]+stoi(s3);
 							}else{
-								cout<<"Immediate value is not an integer\n";
+								cout<<"Immediate value is not an integer on line "<<++itr<<endl;
 								throwError=1;
 								return;
 							}
@@ -283,7 +290,7 @@ void parser(vector<string> tokens){
 								if(labels.find(s3)!=labels.end()){
 									itr=labels[s3];
 								}else{
-									cout<<"Invalid label\n";
+									cout<<"Invalid label on line "<<++itr<<endl;
 									throwError=1;
 									return;
 								}
@@ -293,14 +300,14 @@ void parser(vector<string> tokens){
 								if(labels.find(s3)!=labels.end()){
 									itr=labels[s3];
 								}else{
-									cout<<"Invalid label\n";
+									cout<<"Invalid label on line "<<++itr<<endl;
 									throwError=1;
 									return;
 								}
 							}
 						}
 					}else{
-						cout<<"Invalid register\n";
+						cout<<"Invalid register on line "<<++itr<<endl;
 						throwError=1;
 						return;
 					}
@@ -310,7 +317,7 @@ void parser(vector<string> tokens){
 					operations[s0]++;
 				}
 			}else{
-				cout<<"Invalid Instruction "<<itr<<endl;
+				cout<<"Invalid Instruction on line "<<++itr<<endl;
 				throwError=1;
 				return;
 			}
@@ -403,7 +410,7 @@ int main(int argc, char** argv)
 			if(strings[0][l-1]==':'){
 				labels[strings[0].substr(0,l-1)]=i;
 			}else{
-				cout<<"Colon required at the end of label at line "<<i<<endl;
+				cout<<"Colon required at the end of label at line "<<++i<<endl;
 				throwError=1;
 				return 0;
 			}
