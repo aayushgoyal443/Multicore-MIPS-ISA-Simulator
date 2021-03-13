@@ -2,14 +2,13 @@
 #include<fstream>
 using namespace std;
 
-map<string,int> registers;
-map<string,int> operations;
-map<string,int> labels;
-map<string,string> variables;
+unordered_map<string,int> registers;
+unordered_map<string,int> operations;
+unordered_map<string,int> labels;
+int memory[1<<18] = {0};
 vector<string> instructions;
 int itr = 0;
 int throwError = 0;
-
 
 string int_to_hex(int n){
 	string binary;
@@ -53,7 +52,9 @@ string int_to_hex(int n){
 	return hex;
 }
 
-bool check_number(string str) {
+bool check_number(string str){
+	if(str.length()==0)
+		return true;
    	if(!isdigit(str[0])){
 	   	if(str[0]!='-' && str[0]!='+'){
 		   return false;
@@ -63,6 +64,53 @@ bool check_number(string str) {
    		if (isdigit(str[i]) == false)
       		return false;
     return true;
+}
+
+bool checkReg(string reg){
+	int n=reg.length();
+	if(!check_number(reg)){
+		if(n<5){
+			return false;
+		}else{
+			if(reg[n-5]=='(' && reg[n-1]==')'){
+				string s = reg.substr(n-4,3);
+				if(registers.find(s)!=registers.end()){
+					return true;
+				}else{
+					return false;
+				}
+			}else{
+				return false;
+			}
+		}
+	}else{
+		return true;
+	}
+}
+
+int locateAddress(string reg){
+	int addr;
+	int n=reg.length();
+	if(check_number(reg)){
+		addr=stoi(reg);
+	}else{
+		int num=0;
+		string first = reg.substr(0,n-5);
+		string second = reg.substr(n-4,3);
+		if(first!=""){
+			num = stoi(first);
+		}
+		addr=(num+registers[second]);
+		if(addr%4==0){
+			addr=addr/4;
+		}else{
+			addr=-1;
+		}
+	}
+	if(addr>(1<<18)){
+		addr=-1;
+	}
+	return addr;
 }
 
 void printRegisters(){
@@ -146,12 +194,40 @@ void process(vector<string> tokens){
 				}else if(m==3){
 					string s1=tokens[1];
 					string s2=tokens[2];
-					if(s0=="lw"){
-						registers[s1]=stoi(variables[s2]);
-					}else if(s0=="sw"){
-						return; 		 //edit
+					if(registers.find(s1)==registers.end()){
+						cout<<"Invalid register\n";
+						throwError=1;
+						return;
+					}
+					if(s0=="li"){
+						if(!check_number(s2)){
+							cout<<"Please provide a number as a second argument in li"<<endl;
+							throwError=1;
+							return;
+						}
+						registers[s1]=stoi(s2);
 					}else{
-						registers[s1]=stoi(s2);			//li
+						if(!checkReg(s2)){
+							cout<<"Invalid format of memory address."<<endl;
+						}
+						int address=locateAddress(s2);
+						if(s0=="lw"){
+							if(address<0){
+								cout<<"Unaligned memory address."<<endl;
+							}else{
+								registers[s1]=memory[address];
+							}
+						}else if(s0=="sw"){
+							if(address<0){
+								cout<<"Unaligned memory address."<<endl;
+							}else{
+								memory[address]=registers[s1];
+							}		
+						}else{
+							cout<<"Invalid instruction\n";
+							throwError=1;
+							return;
+						}
 					}
 				}else if(m==4){
 					string s1=tokens[1];
@@ -341,13 +417,7 @@ int main(int argc, char** argv)
 
 	while(itr<n){
 		string currentLine = instructions[itr];
-		//istringstream f(currentLine);
 		vector<string> strings;
-		//string c;
-
-		// while(getline(f,c,' ')){
-		// 	strings.push_back(c);		
-		// }
 
 		strings=split(currentLine);
 		process(strings);

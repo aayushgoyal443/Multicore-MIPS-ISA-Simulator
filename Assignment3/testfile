@@ -1,14 +1,4 @@
-li $s0,0
-li $s1,4
-
-loop      :
-
-    addi $s2,$s2,2      
-    beq $s0,$s1,loop_exit
-    addi $s0,$s0,1
-
-    j loop
-
-loop_exit:
-
-    li $s3,1
+li $s0,12
+li $s1,17
+sw $s0,4
+lw $s2,4($s0)
