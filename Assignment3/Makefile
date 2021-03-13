@@ -1,2 +1,5 @@
 all:
-	g++ code.cpp -o output && ./output testfile
+	g++ code.cpp -o output
+
+clean:
+	rm output
