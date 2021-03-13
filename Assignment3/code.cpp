@@ -169,7 +169,7 @@ void fillOpers()
 	operations["addi"]=0;
 }
 
-void process(vector<string> tokens){
+void parser(vector<string> tokens){
 	int m=tokens.size();
 	string s0=tokens[0];
 	if(m>4){
@@ -320,7 +320,7 @@ void process(vector<string> tokens){
 	}
 }
 
-vector<string> split(string line){
+vector<string> lexer(string line){
 	int n=line.length();
 	vector<string> v;
 	bool first=false;
@@ -385,7 +385,7 @@ int main(int argc, char** argv)
 
 	while(getline(myFile,line)){
 		vector <string> strings;
-		strings = split(line);
+		strings = lexer(line);
 		if(strings.size()!=0){
 			instructions.push_back(line);
 		}
@@ -396,7 +396,7 @@ int main(int argc, char** argv)
 		string currentLine = instructions[i];
 		vector<string> strings;
 
-		strings=split(currentLine);
+		strings=lexer(currentLine);
 
 		if(strings.size()==1){
 			int l=strings[0].size();
@@ -419,8 +419,8 @@ int main(int argc, char** argv)
 		string currentLine = instructions[itr];
 		vector<string> strings;
 
-		strings=split(currentLine);
-		process(strings);
+		strings=lexer(currentLine);
+		parser(strings);
 		if(throwError==1){
 			return 0;
 		}
