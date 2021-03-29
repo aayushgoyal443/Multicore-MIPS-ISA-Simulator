@@ -319,6 +319,7 @@ void parser(vector<string> tokens){
 							return;
 						}
 						registers[s1]=memory[address];
+						printRegisters();
 					}
 					else if(s0=="sw"){
 						if (address==-2){
