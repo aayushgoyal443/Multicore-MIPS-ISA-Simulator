@@ -445,6 +445,10 @@ void print_stats(){
 
 int main(int argc, char** argv){
 
+	if (argc!=4){
+		cout <<"You have to pass 4 parameters: ./assignment4.exe <file_name> <row_access_delay> <col_access_delay>\n";
+		return 0;
+	}
 	string fileName = argv[1];
 	ifstream myFile(fileName);
 	row_access_delay = stoi(argv[2]);
