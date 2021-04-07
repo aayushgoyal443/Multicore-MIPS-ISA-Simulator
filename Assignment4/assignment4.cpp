@@ -1,7 +1,7 @@
 #include<bits/stdc++.h>
 using namespace std;
 
-unordered_map<string,int> registers;
+map<string,int> registers;
 unordered_map<string,int> operations;
 unordered_map<string,int> labels;
 vector <string> regPrint;
@@ -10,7 +10,9 @@ int itr = 0;
 int counter =0;
 int throwError = 0;
 int clockCycles=1;
-int row_buffer_updates=1;
+int row_buffer_updates=0;
+int time_req =-1;	// This marks at which the clockcycle the DRAM request will complete
+string store="";
 
 vector <vector<int>> DRAM(1024,vector<int>(256,0));	// becuase every column in itself represents 4 Bytes so the column size is only 256
 vector <int> buffer(256,0);
@@ -18,10 +20,8 @@ int currRow=-1;
 int row_access_delay=0;
 int col_access_delay=0;
 
-map <int, set<tuple<int, string, string, int>>>waitingList;
-map<string, int> registerUpdate;
-map<int, int> memoryUpdate;
-map<int, int> counterLocation;
+map <int, map<int, queue<pair<int, string>>>> waitingList;	//[row][col]= {counter, reg_name/value}   ** value denotes that it was a sw instruction and reg_name denotes it was a register 
+map<string,pair<int,int>> registerUpdate; // [reg_name] = {counter, address} ; the last address and counter at which it was updtaed
 
 // Helper functions:-
 bool check_number(string str);
@@ -31,6 +31,98 @@ void fillRegs();
 void fillOpers();
 vector<string> lexer(string line);
 void print_stats();
+
+tuple <int, int, int, string> getCommand(){
+	int row = currRow;
+	if (waitingList.find(currRow)== waitingList.end()) row = (*waitingList.begin()).first;
+	int col = (*waitingList[row].begin()).first;
+	int count = waitingList[row][col].front().first;
+	string reg = waitingList[row][col].front().second;
+	return {row, col, count, reg};
+}
+
+void processCommand(tuple <int, int, int, string> command){
+	// As you process, don't forget to remove from the thing from Register Update
+	int row = get<0>(command);
+	int col = get<1>(command);
+	int count = get<2>(command);
+	string reg = get<3>(command);
+
+	int address = 1024*row + 4*col;
+
+	time_req+=clockCycles;
+
+	if (currRow!= row){
+		if (currRow != -1){
+			DRAM[currRow]  = buffer;
+			time_req+= row_access_delay;
+		}
+		currRow = row;
+		buffer = DRAM[currRow];
+		row_buffer_updates++;
+		time_req+= row_access_delay;
+	}
+
+	if (check_number(reg)){
+		// Means this was a sw operation, and we are not ignoring any sw operation
+		buffer[col] = stoi(reg);
+		row_buffer_updates++;
+		time_req+= col_access_delay;
+		store = "cycle " + to_string(clockCycles) + "-" + to_string(time_req) + ": Memory address " + to_string(address) + "-" + to_string(address+3) + "= " + to_string(stoi(reg)) + "\n";
+	}
+	else{
+		// means this is a lw operation
+		if (registerUpdate.find(reg) != registerUpdate.end() && registerUpdate[reg].first == count){
+			registers[reg] = buffer[col];
+			registerUpdate.erase(reg);
+			time_req+= col_access_delay;
+			store = "cycle " + to_string(clockCycles) + "-" + to_string(time_req) + ": " + reg + "= " + to_string(buffer[col]) + "\n";
+		}
+		// else it was a redundant opperation and we don't have to do anything
+	}
+	waitingList[row][col].pop();
+	if (waitingList[row][col].empty() ) waitingList[row].erase(col);
+	if (waitingList[row].empty()) waitingList.erase(row);
+}
+
+void processCompletion(){
+	cout << store;
+	time_req =-1;
+	store = "";
+}
+
+void completeRegister(string name){
+	if (registerUpdate.find(name)== registerUpdate.end()){
+		if (store.find(name) != string::npos){
+			// Means we were currently processing that required register only
+			clockCycles = time_req+1;
+			processCompletion();
+		}
+		return;
+	}
+	// else we have unfinished business
+
+	if (time_req != -1){	// Need to complete the ongoing work forcefully
+		clockCycles = time_req+1;
+		processCompletion();
+	}
+
+	// Complete that [row][col]
+	int count = registerUpdate[name].first;
+	int address  = registerUpdate[name].second;
+	int row = address/1024;
+	int col = (address%1024)/4;
+
+	pair<int, string> p;
+	while(true){
+		p = waitingList[row][col].front();
+		processCommand({row,col,p.first, p.second});
+		clockCycles = time_req+1;
+		processCompletion();
+
+		if (p.first == count) break;
+	}
+}
 
 // Parser executes the required functions
 void parser(vector<string> tokens){
@@ -59,14 +151,18 @@ void parser(vector<string> tokens){
 			throwError =1;
 			return;
 		}
-		if(labels.find(s1)!=labels.end()){
-			itr=labels[s1];
-			cout <<"cycle "<<clockCycles++<<": Jumping to "<<s1<<"\n";
-		}
-		else{
+		if(labels.find(s1)==labels.end()){
 			cout<<"Such a label doesn't exist on line "<<(++itr)<<endl;
 			throwError=1;
 			return;
+		}
+		if (time_req == clockCycles){
+			processCompletion();
+		}
+		itr=labels[s1];
+		cout <<"cycle "<<clockCycles++<<": Jumping to "<<s1<<"\n";
+		if (time_req ==-1 && !waitingList.empty() ){
+			processCommand(getCommand());
 		}
 	}
 	else if(m==3){
@@ -106,65 +202,21 @@ void parser(vector<string> tokens){
 		int row = address/1024;
 		int col = (address%1024)/4;
 
-		if(s0=="lw"){
-			cout << "cycle "<< clockCycles++ << ": DRAM request issued\n";
+		if (s0 =="sw") completeRegister(s1);
+		if (time_req == clockCycles){
+			processCompletion();
+		}
+		cout << "cycle "<< clockCycles++ << ": DRAM request issued\n";
 
-			if (row==currRow){
-				registers[s1] = buffer[col];
-				cout <<"cycle "<< clockCycles <<"-"<<clockCycles+col_access_delay-1<<": "<< s1<<"= "<<buffer[col]<<"\n";
-				clockCycles+= col_access_delay;
-			}
-			else{
-				if (currRow==-1){
-					currRow =row;
-					buffer = DRAM[row];
-					registers[s1] = buffer[col];
-					cout <<"cycle "<< clockCycles <<"-"<<clockCycles+row_access_delay+col_access_delay-1<<": "<< s1<<"= "<<buffer[col]<<"\n";
-					clockCycles+= (row_access_delay+col_access_delay);
-				}
-				else{
-					row_buffer_updates++;
-					DRAM[currRow] = buffer;
-					currRow =row;
-					buffer = DRAM[row];
-					registers[s1] = buffer[col];
-					cout <<"cycle "<< clockCycles <<"-"<<clockCycles+2*row_access_delay+col_access_delay-1<<": "<< s1<<"= "<<buffer[col]<<"\n";
-					clockCycles+= (2*row_access_delay+col_access_delay);
-				}
-			}
-			waitingList[row].insert({counter, s0, s1, address});
-			registerUpdate[s1] = counter;
-			counterLocation[counter] = row;
+		if(s0=="lw"){
+			waitingList[row][col].push({counter, s1});
+			registerUpdate[s1] = {counter, address};
 		}
 		else if(s0=="sw"){
-			cout << "cycle "<< clockCycles++ << ": DRAM request issued\n";
-			row_buffer_updates++;
-			if (row==currRow){
-				buffer[col] = registers[s1];
-				cout <<"cycle "<< clockCycles <<"-"<<clockCycles+col_access_delay-1<<": Memory address "<<address<<"-"<<address+3<<"= "<<registers[s1]<<"\n";
-				clockCycles+= col_access_delay;
-			}
-			else{
-				if (currRow==-1){
-					currRow =row;
-					buffer = DRAM[row];
-					buffer[col] = registers[s1];
-					cout <<"cycle "<< clockCycles <<"-"<<clockCycles+row_access_delay+col_access_delay-1<<": Memory address "<<address<<"-"<<address+3<<"= "<<registers[s1]<<"\n";
-					clockCycles+= (row_access_delay+col_access_delay);
-				}
-				else{
-					row_buffer_updates++;
-					DRAM[currRow] = buffer;
-					currRow =row;
-					buffer = DRAM[row];
-					buffer[col] = registers[s1];
-					cout <<"cycle "<< clockCycles <<"-"<<clockCycles+2*row_access_delay+col_access_delay-1<<": Memory address "<<address<<"-"<<address+3<<"= "<<registers[s1]<<"\n";
-					clockCycles+= (2*row_access_delay+col_access_delay);
-				}
-			}
-			waitingList[row].insert({counter, s0, s1, address});
-			memoryUpdate[address] = counter;
-			counterLocation[counter] = row;
+			waitingList[row][col].push({counter, to_string(registers[s1])});
+		}
+		if (time_req ==-1 && !waitingList.empty() ){
+			processCommand(getCommand());
 		}
 	}
 	else if(m==4){
@@ -182,6 +234,11 @@ void parser(vector<string> tokens){
 				throwError=1;
 				return;
 			}
+			completeRegister(s1);
+			completeRegister(s2);
+			if (time_req == clockCycles){
+				processCompletion();
+			}
 			int toJump = 0;
 			if (s0 == "beq" && registers[s1]==registers[s2]){
 				toJump = 1;
@@ -195,6 +252,9 @@ void parser(vector<string> tokens){
 			}
 			else{
 				cout <<"cycle "<<clockCycles++<<": No jump required to "<< s3 <<"\n";
+			}
+			if (time_req ==-1 && !waitingList.empty() ){
+				processCommand(getCommand());
 			}
 		}
 		else if (s0=="add" || s0=="sub" || s0=="mul" || s0 == "slt" || s0=="addi"){
@@ -214,14 +274,25 @@ void parser(vector<string> tokens){
 				throwError=1;
 				return;
 			}
+			
+			completeRegister(s2);
+			if (s0 != "addi") completeRegister(s3);
+			if (time_req == clockCycles){
+				processCompletion();
+			}
 
 			if (s0 == "add") registers[s1]=registers[s2]+registers[s3];
 			else if (s0=="sub") registers[s1]=registers[s2]-registers[s3];
 			else if (s0 == "mul") registers[s1]=registers[s2]*registers[s3];
 			else if (s0 == "slt") registers[s1]= (registers[s2]<registers[s3]);
 			else if (s0=="addi") registers[s1]=registers[s2]+stoi(s3);
-			
+
 			cout <<"cycle "<<clockCycles++<<": "<<s1<<"= "<<registers[s1]<<"\n";
+			registerUpdate.erase(s1);	// Because notice that this is not a dependent instruction and can be used to ignore all the previous lw into this register
+			// Also note thatt this should not affect the "sw" operations and hence we statically passed the values to sw.
+			if (time_req ==-1 && !waitingList.empty() ){
+				processCommand(getCommand());
+			}
 		}
 		
 		else{
@@ -330,8 +401,18 @@ int main(int argc, char** argv){
 		}
 	}
 
+	// Complete any remaining requests in the DRAM
+	if (time_req != -1){
+		clockCycles = time_req+1;
+		processCompletion();
+	}
+	while (!waitingList.empty()){
+		processCommand(getCommand());
+		clockCycles = time_req+1;
+		processCompletion();
+	}
+
 	if (currRow!=-1) DRAM[currRow] = buffer;
-	else row_buffer_updates=0;
 
 	print_stats();
 
