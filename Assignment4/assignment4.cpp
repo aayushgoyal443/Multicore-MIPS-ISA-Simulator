@@ -11,8 +11,12 @@ int throwError = 0;
 int clockCycles = 1;
 int row_buffer_updates = 0;
 int time_req = -1;	// This marks the clock cycle at which the DRAM request will complete
-string store = "";	// This stores the string to be printed before the lw/sw execution of the engaged register completes
-string store_alt = "";
+
+tuple <string ,string, string, string, int> store;
+// {sw, clockCycles, address- address+3, value, count}
+// {lw, clockCycles, register name, value, count} 
+
+unordered_map <string, int> forRefusing;	// this will store the last count at which a register was updated in the *Processor*
 
 int last_updated_address = -1;
 int last_stored_value = 0;
@@ -38,24 +42,12 @@ vector<int> insCounter;
 // Helper functions:-
 bool check_number(string str);
 bool checkAddress(string reg);
+string extract_reg(string reg);
 int locateAddress(string reg);
 void fillRegs();
 void fillOpers();
 vector<string> lexer(string line);
 void print_stats();
-
-// To extract a potentially unsafe register from the address in an lw instruction
-string extract_reg(string reg){
-	int n=reg.length();
-	string second = reg.substr(n-4,3);
-	if (n>=7 && reg.substr(n-7)=="($zero)"){
-		second = reg.substr(n-6,5);
-	}
-	else if (reg[n-4]=='(' && reg[n-1]==')'){
-		second = reg.substr(n-3,2);
-	}
-	return second;
-}
 
 tuple <int, int, int, string> getCommand(){
 	if (waitingList.empty()) return {-1,-1,-1,""};
@@ -105,17 +97,14 @@ void processCommand(tuple <int, int, int, string> command){
 		buffer[col] = stoi(reg);
 		row_buffer_updates++;
 		time_req+= col_access_delay;
-		store = "cycle " + to_string(clockCycles) + "-" + to_string(time_req) + ": Memory address " + to_string(address) + "-" + to_string(address+3) + "= " + to_string(stoi(reg)) + "\n\n";
-		store_alt = instructions[insCounter[count-1]] + " - " + to_string(insCounter[count-1]) + "\n" + store;
+		store = {"sw",to_string(clockCycles),to_string(address) + "-" + to_string(address+3),to_string(stoi(reg)), count };
 	}
 	else{
 		// means this is a lw operation
 		registers[reg] = buffer[col];
 		registerUpdate.erase(reg);
 		time_req+= col_access_delay;
-		
-		store = "cycle " + to_string(clockCycles) + "-" + to_string(time_req) + ": " + reg + "= " + to_string(buffer[col]) + "\n\n";
-		store_alt = instructions[insCounter[count-1]] + " - " + to_string(insCounter[count-1]) + "\n" + store;
+		store  = {"lw", to_string(clockCycles), reg, to_string(buffer[col]), count};
 	}
 	waitingList[row][col].pop();
 	if (waitingList[row][col].empty() ) waitingList[row].erase(col);
@@ -123,15 +112,24 @@ void processCommand(tuple <int, int, int, string> command){
 }
 
 void processCompletion(){
-	cout << store_alt;
+	int count = get<4>(store);
+	string reg = get<2>(store);
+	cout << to_string(insCounter[count-1]+1) +" => " +instructions[insCounter[count-1]]+"\n";
+	cout << "cycle " + get<1>(store) + "-" + to_string(time_req)+": ";
+	if (get<0>(store)=="lw"){
+		if (forRefusing[reg] > count) cout << "Rejected by processor, "<< reg<< " already updated in procesor\n\n";
+		else  cout << reg + "= " + get<3>(store) + "\n\n";
+	}
+	else{
+		cout << "Memory address " + reg + "= " + get<3>(store) + "\n\n";
+	}
 	time_req =-1;
-	store = "";
-	store_alt = "";
+	store = tuple <string ,string, string, string, int>();
 }
 
 void completeRegister(string name){
 	if (registerUpdate.find(name)== registerUpdate.end()){
-		if (store.find(name) != string::npos){
+		if (get<2>(store) == name){
 			// Means we were currently processing that required register only
 			clockCycles = time_req+1;
 			processCompletion();
@@ -208,12 +206,13 @@ void parser(vector<string> tokens){
 			throwError=1;
 			return;
 		}
+		itr=labels[s1];
+		cout << itr+1<<" => "<<instructions[itr]<<"\n";
+		cout <<"cycle "<<clockCycles<<": Jumping to "<<s1<<"\n\n";
 		if (time_req == clockCycles){
 			processCompletion();
 		}
-		itr=labels[s1];
-		cout<<instructions[itr]<<" - "<<itr<<"\n";
-		cout <<"cycle "<<clockCycles++<<": Jumping to "<<s1<<"\n\n";
+		clockCycles++;
 		if (time_req ==-1 && !waitingList.empty() ){
 			processCommand(getCommand());
 		}
@@ -258,23 +257,29 @@ void parser(vector<string> tokens){
 		int col = (address%1024)/4;
 
 		if (s0 =="sw") completeRegister(s1);
-		if (time_req == clockCycles){
-			processCompletion();
-		}
 		if (clock_initial!= clockCycles){
 			if (time_req ==-1 && !waitingList.empty() ){
 				processCommand(getCommand());
 			}
 		}
-		cout<<instructions[itr]<<" - "<<itr<<"\n";
 		if (s0=="lw" && address == last_updated_address){
 			registers[s1] = last_stored_value;
+			forRefusing[s1] = counter;
 			registerUpdate.erase(s1);
-			cout << "cycle "<< clockCycles++ << ": "<<s1<<"= "<<last_stored_value<<"; Due to forwarding;"<<"\n\n";
+			cout << itr+1<<" => "<<instructions[itr]<<"\n";
+			cout << "cycle "<< clockCycles << ": "<<s1<<"= "<<last_stored_value<<" | Due to forwarding"<<"\n\n";
+			if (time_req == clockCycles){
+				processCompletion();
+			}
+			clockCycles++;
 		}
 		else{
-			cout << "cycle "<< clockCycles++ << ": DRAM request issued"<<"\n\n";
-
+			cout << itr+1<<" => "<<instructions[itr]<<"\n";
+			cout << "cycle "<< clockCycles << ": DRAM request issued"<<"\n\n";
+			if (time_req == clockCycles){
+				processCompletion();
+			}
+			clockCycles++;
 			if(s0=="lw"){
 				waitingList[row][col].push({counter, s1});
 				registerUpdate[s1] = {counter, address};
@@ -307,9 +312,6 @@ void parser(vector<string> tokens){
 			int clock_initial = clockCycles;
 			completeRegister(s1);
 			completeRegister(s2);
-			if (time_req == clockCycles){
-				processCompletion();
-			}
 			if (clock_initial!= clockCycles){
 				if (time_req ==-1 && !waitingList.empty() ){
 					processCommand(getCommand());
@@ -322,15 +324,18 @@ void parser(vector<string> tokens){
 			else if (s0 == "bne" && registers[s1]!=registers[s2]){
 				toJump = 1;
 			}
+			cout << itr+1<<" => "<<instructions[itr]<<"\n";
 			if(toJump==1){
 				itr=labels[s3];
-				cout<<instructions[itr]<<" - "<<itr<<"\n";
-				cout <<"cycle "<<clockCycles++<<": Jumping to "<<s3<<"\n\n";
+				cout <<"cycle "<<clockCycles<<": Jumping to "<<s3<<"\n\n";
 			}
 			else{
-				cout<<instructions[itr]<<" - "<<itr<<"\n";
-				cout <<"cycle "<<clockCycles++<<": No jump required to "<< s3 <<"\n\n";
+				cout <<"cycle "<<clockCycles<<": No jump required to "<< s3 <<"\n\n";
 			}
+			if (time_req == clockCycles){
+				processCompletion();
+			}
+			clockCycles++;
 			if (time_req ==-1 && !waitingList.empty() ){
 				processCommand(getCommand());
 			}
@@ -356,9 +361,6 @@ void parser(vector<string> tokens){
 			int clock_initial = clockCycles;
 			completeRegister(s2);
 			if (s0 != "addi") completeRegister(s3);
-			if (time_req == clockCycles){
-				processCompletion();
-			}
 			if (clock_initial!= clockCycles){
 				if (time_req ==-1 && !waitingList.empty() ){
 					processCommand(getCommand());
@@ -369,11 +371,14 @@ void parser(vector<string> tokens){
 			else if (s0 == "mul") registers[s1]=registers[s2]*registers[s3];
 			else if (s0 == "slt") registers[s1]= (registers[s2]<registers[s3]);
 			else if (s0=="addi") registers[s1]=registers[s2]+stoi(s3);
-
-			cout<<instructions[itr]<<" - "<<itr<<"\n";
-			cout <<"cycle "<<clockCycles++<<": "<<s1<<"= "<<registers[s1]<<"\n\n";
-			registerUpdate.erase(s1);	// Because notice that this is not a dependent instruction and can be used to ignore all the previous lw into this register
-			// Also note that this should not affect the "sw" operations and hence we statically passed the values to sw.
+			forRefusing[s1] = counter;
+			registerUpdate.erase(s1);	
+			cout << itr+1<<" => "<<instructions[itr]<<"\n";
+			cout <<"cycle "<<clockCycles<<": "<<s1<<"= "<<registers[s1]<<"\n\n";
+			if (time_req == clockCycles){
+				processCompletion();
+			}	
+			clockCycles++;
 			if (time_req ==-1 && !waitingList.empty() ){
 				processCommand(getCommand());
 			}
@@ -570,6 +575,19 @@ bool checkAddress(string reg){
 			return false;
 		}
 	}
+}
+
+// To extract a potentially unsafe register from the address in an lw instruction
+string extract_reg(string reg){
+	int n=reg.length();
+	string second = reg.substr(n-4,3);
+	if (n>=7 && reg.substr(n-7)=="($zero)"){
+		second = reg.substr(n-6,5);
+	}
+	else if (reg[n-4]=='(' && reg[n-1]==')'){
+		second = reg.substr(n-3,2);
+	}
+	return second;
 }
 
 // To get the memory address from a string
