@@ -1,3 +1,5 @@
+// @TODO: Printing instruction address
+// @TODO: Printing row buffer updates
 #include<bits/stdc++.h>
 using namespace std;
 
@@ -13,6 +15,8 @@ int clockCycles=1;
 int row_buffer_updates=0;
 int time_req =-1;	// This marks at which the clockcycle the DRAM request will complete
 string store="";
+int last_updated_address=-1;
+int last_stored_value=0;
 
 vector <vector<int>> DRAM(1024,vector<int>(256,0));	// becuase every column in itself represents 4 Bytes so the column size is only 256
 vector <int> buffer(256,0);
@@ -32,21 +36,46 @@ void fillOpers();
 vector<string> lexer(string line);
 void print_stats();
 
+// The extract the register from the addreess
+string extract_address(string reg){
+	int n=reg.length();
+	string second = reg.substr(n-4,3);
+	if (n>=7 && reg.substr(n-7)=="($zero)"){
+		second = reg.substr(n-6,5);
+	}
+	else if (reg[n-4]=='(' && reg[n-1]==')'){
+		second = reg.substr(n-3,2);
+	}
+	return second;
+}
+
 tuple <int, int, int, string> getCommand(){
+	if (waitingList.empty()) return {-1,-1,-1,""};
 	int row = currRow;
 	if (waitingList.find(currRow)== waitingList.end()) row = (*waitingList.begin()).first;
 	int col = (*waitingList[row].begin()).first;
 	int count = waitingList[row][col].front().first;
 	string reg = waitingList[row][col].front().second;
-	return {row, col, count, reg};
+	bool check_lw = (!check_number(reg));	// true if "lw" operation
+	bool check1 = check_lw &&  (registerUpdate.find(reg)== registerUpdate.end());	// means laod on that register is not required, hence redundant operation
+	bool check2 = (check_lw && (!check1)) && (registerUpdate[reg].first != count);	// Update on register is required but not here, hence redundant operation
+	if (check_lw && (check1 || check2)){
+		waitingList[row][col].pop();
+		if (waitingList[row][col].empty() ) waitingList[row].erase(col);
+		if (waitingList[row].empty()) waitingList.erase(row);
+		return getCommand();
+	}
+	else return {row, col, count, reg};
 }
 
+// This should never be passed any redundant instruction
 void processCommand(tuple <int, int, int, string> command){
 	// As you process, don't forget to remove from the thing from Register Update
 	int row = get<0>(command);
 	int col = get<1>(command);
 	int count = get<2>(command);
 	string reg = get<3>(command);
+	if (row==-1 && col==-1 && count==-1 && reg=="") return;
 
 	int address = 1024*row + 4*col;
 
@@ -108,19 +137,32 @@ void completeRegister(string name){
 	}
 
 	// Complete that [row][col]
-	int count = registerUpdate[name].first;
+	int count_req = registerUpdate[name].first;
 	int address  = registerUpdate[name].second;
 	int row = address/1024;
 	int col = (address%1024)/4;
 
 	pair<int, string> p;
+	string reg="";
+	int count=-1;
 	while(true){
 		p = waitingList[row][col].front();
-		processCommand({row,col,p.first, p.second});
+		count = p.first;
+		reg = p.second;
+		bool check_lw = (!check_number(reg));	// true if "lw" operation
+		bool check1 = check_lw &&  (registerUpdate.find(reg)== registerUpdate.end());	// means laod on that register is not required, hence redundant operation
+		bool check2 = (check_lw && (!check1)) && (registerUpdate[reg].first != count);	// Update on register is required but not here, hence redundant operation
+		if (check_lw && (check1 || check2)){
+			waitingList[row][col].pop();
+			if (waitingList[row][col].empty() ) waitingList[row].erase(col);
+			if (waitingList[row].empty()) waitingList.erase(row);
+			continue;
+		}
+		processCommand({row,col,count, reg});
 		clockCycles = time_req+1;
 		processCompletion();
 
-		if (p.first == count) break;
+		if (p.first == count_req) break;
 	}
 }
 
@@ -188,6 +230,8 @@ void parser(vector<string> tokens){
 			throwError=1;
 			return;
 		}
+		int clock_initial = clockCycles;
+		completeRegister(extract_address(s2));
 		int address=locateAddress(s2);
 		if (address==-2){
 			cout <<"Only 2^20 Bytes of memory could be used on line "<<(++itr)<<endl;
@@ -206,14 +250,29 @@ void parser(vector<string> tokens){
 		if (time_req == clockCycles){
 			processCompletion();
 		}
-		cout << "cycle "<< clockCycles++ << ": DRAM request issued\n";
-
-		if(s0=="lw"){
-			waitingList[row][col].push({counter, s1});
-			registerUpdate[s1] = {counter, address};
+		if (clock_initial!= clockCycles){
+			if (time_req ==-1 && !waitingList.empty() ){
+				processCommand(getCommand());
+			}
 		}
-		else if(s0=="sw"){
-			waitingList[row][col].push({counter, to_string(registers[s1])});
+
+		if (s0=="lw" && address == last_updated_address){
+			registers[s1] = last_stored_value;
+			registerUpdate.erase(s1);
+			cout << "cycle "<< clockCycles++ << ": "<<s1<<"= "<<last_stored_value<<"; Due to forwarding; INSTR ADDR "<<"\n";
+		}
+		else{
+			cout << "cycle "<< clockCycles++ << ": DRAM request issued\n";
+
+			if(s0=="lw"){
+				waitingList[row][col].push({counter, s1});
+				registerUpdate[s1] = {counter, address};
+			}
+			else if(s0=="sw"){
+				waitingList[row][col].push({counter, to_string(registers[s1])});
+				last_updated_address = address;
+				last_stored_value = registers[s1];
+			}
 		}
 		if (time_req ==-1 && !waitingList.empty() ){
 			processCommand(getCommand());
@@ -234,10 +293,16 @@ void parser(vector<string> tokens){
 				throwError=1;
 				return;
 			}
+			int clock_initial = clockCycles;
 			completeRegister(s1);
 			completeRegister(s2);
 			if (time_req == clockCycles){
 				processCompletion();
+			}
+			if (clock_initial!= clockCycles){
+				if (time_req ==-1 && !waitingList.empty() ){
+					processCommand(getCommand());
+				}
 			}
 			int toJump = 0;
 			if (s0 == "beq" && registers[s1]==registers[s2]){
@@ -275,12 +340,18 @@ void parser(vector<string> tokens){
 				return;
 			}
 			
+			int clock_initial = clockCycles;
 			completeRegister(s2);
 			if (s0 != "addi") completeRegister(s3);
 			if (time_req == clockCycles){
 				processCompletion();
 			}
 
+			if (clock_initial!= clockCycles){
+				if (time_req ==-1 && !waitingList.empty() ){
+					processCommand(getCommand());
+				}
+			}
 			if (s0 == "add") registers[s1]=registers[s2]+registers[s3];
 			else if (s0=="sub") registers[s1]=registers[s2]-registers[s3];
 			else if (s0 == "mul") registers[s1]=registers[s2]*registers[s3];
@@ -437,7 +508,7 @@ bool check_number(string str){
 // To check whether somethig is a valid memory 
 bool checkAddress(string reg){
 	int n=reg.length();
-	if (check_number(reg)) return true;
+	if (check_number(reg)) return false;
 
 	if (n>=7 && reg.substr(n-7)=="($zero)") return true;
 	
