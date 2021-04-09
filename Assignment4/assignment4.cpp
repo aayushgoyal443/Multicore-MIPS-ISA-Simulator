@@ -1,31 +1,39 @@
-// @TODO: Printing instruction address
-// @TODO: Printing row buffer updates
 #include<bits/stdc++.h>
 using namespace std;
 
 map<string,int> registers;
 unordered_map<string,int> operations;
 unordered_map<string,int> labels;
-vector <string> regPrint;
 vector<string> instructions;
 int itr = 0;
-int counter =0;
+int counter = 0;
 int throwError = 0;
-int clockCycles=1;
-int row_buffer_updates=0;
-int time_req =-1;	// This marks at which the clockcycle the DRAM request will complete
-string store="";
-int last_updated_address=-1;
-int last_stored_value=0;
+int clockCycles = 1;
+int row_buffer_updates = 0;
+int time_req = -1;	// This marks the clock cycle at which the DRAM request will complete
+string store = "";	// This stores the string to be printed before the lw/sw execution of the engaged register completes
+string store_alt = "";
 
-vector <vector<int>> DRAM(1024,vector<int>(256,0));	// becuase every column in itself represents 4 Bytes so the column size is only 256
+int last_updated_address = -1;
+int last_stored_value = 0;
+
+//Parameters related to the DRAM memory and the ROW_BUFFER
+vector <vector<int>> DRAM(1024,vector<int>(256,0));		//because every column in itself represents 4 bytes so the column size is only 256
 vector <int> buffer(256,0);
-int currRow=-1;
-int row_access_delay=0;
-int col_access_delay=0;
+int currRow=-1;											//row number of current row buffer
 
-map <int, map<int, queue<pair<int, string>>>> waitingList;	//[row][col]= {counter, reg_name/value}   ** value denotes that it was a sw instruction and reg_name denotes it was a register 
-map<string,pair<int,int>> registerUpdate; // [reg_name] = {counter, address} ; the last address and counter at which it was updtaed
+//Default delay values
+int row_access_delay=10;
+int col_access_delay=2;
+
+//[row][col]= {counter, reg_name/value}   
+//value denotes that it was a sw instruction and reg_name(register name) denotes it was an lw instruction 
+map <int, map<int, queue<pair<int, string>>>> waitingList;
+
+// [reg_name] = {counter, address} ; the counter and the last address at which it was updated
+map<string,pair<int,int>> registerUpdate; 
+
+vector<int> insCounter;
 
 // Helper functions:-
 bool check_number(string str);
@@ -36,8 +44,8 @@ void fillOpers();
 vector<string> lexer(string line);
 void print_stats();
 
-// The extract the register from the addreess
-string extract_address(string reg){
+// To extract a potentially unsafe register from the address in an lw instruction
+string extract_reg(string reg){
 	int n=reg.length();
 	string second = reg.substr(n-4,3);
 	if (n>=7 && reg.substr(n-7)=="($zero)"){
@@ -57,7 +65,7 @@ tuple <int, int, int, string> getCommand(){
 	int count = waitingList[row][col].front().first;
 	string reg = waitingList[row][col].front().second;
 	bool check_lw = (!check_number(reg));	// true if "lw" operation
-	bool check1 = check_lw &&  (registerUpdate.find(reg)== registerUpdate.end());	// means laod on that register is not required, hence redundant operation
+	bool check1 = check_lw && (registerUpdate.find(reg)== registerUpdate.end());	// means load on that register is not required, hence redundant operation
 	bool check2 = (check_lw && (!check1)) && (registerUpdate[reg].first != count);	// Update on register is required but not here, hence redundant operation
 	if (check_lw && (check1 || check2)){
 		waitingList[row][col].pop();
@@ -97,17 +105,17 @@ void processCommand(tuple <int, int, int, string> command){
 		buffer[col] = stoi(reg);
 		row_buffer_updates++;
 		time_req+= col_access_delay;
-		store = "cycle " + to_string(clockCycles) + "-" + to_string(time_req) + ": Memory address " + to_string(address) + "-" + to_string(address+3) + "= " + to_string(stoi(reg)) + "\n";
+		store = "cycle " + to_string(clockCycles) + "-" + to_string(time_req) + ": Memory address " + to_string(address) + "-" + to_string(address+3) + "= " + to_string(stoi(reg)) + "\n\n";
+		store_alt = instructions[insCounter[count-1]] + " - " + to_string(insCounter[count-1]) + "\n" + store;
 	}
 	else{
 		// means this is a lw operation
-		if (registerUpdate.find(reg) != registerUpdate.end() && registerUpdate[reg].first == count){
-			registers[reg] = buffer[col];
-			registerUpdate.erase(reg);
-			time_req+= col_access_delay;
-			store = "cycle " + to_string(clockCycles) + "-" + to_string(time_req) + ": " + reg + "= " + to_string(buffer[col]) + "\n";
-		}
-		// else it was a redundant opperation and we don't have to do anything
+		registers[reg] = buffer[col];
+		registerUpdate.erase(reg);
+		time_req+= col_access_delay;
+		
+		store = "cycle " + to_string(clockCycles) + "-" + to_string(time_req) + ": " + reg + "= " + to_string(buffer[col]) + "\n\n";
+		store_alt = instructions[insCounter[count-1]] + " - " + to_string(insCounter[count-1]) + "\n" + store;
 	}
 	waitingList[row][col].pop();
 	if (waitingList[row][col].empty() ) waitingList[row].erase(col);
@@ -115,9 +123,10 @@ void processCommand(tuple <int, int, int, string> command){
 }
 
 void processCompletion(){
-	cout << store;
+	cout << store_alt;
 	time_req =-1;
 	store = "";
+	store_alt = "";
 }
 
 void completeRegister(string name){
@@ -150,7 +159,7 @@ void completeRegister(string name){
 		count = p.first;
 		reg = p.second;
 		bool check_lw = (!check_number(reg));	// true if "lw" operation
-		bool check1 = check_lw &&  (registerUpdate.find(reg)== registerUpdate.end());	// means laod on that register is not required, hence redundant operation
+		bool check1 = check_lw &&  (registerUpdate.find(reg)== registerUpdate.end());	// means load on that register is not required, hence redundant operation
 		bool check2 = (check_lw && (!check1)) && (registerUpdate[reg].first != count);	// Update on register is required but not here, hence redundant operation
 		if (check_lw && (check1 || check2)){
 			waitingList[row][col].pop();
@@ -168,6 +177,7 @@ void completeRegister(string name){
 
 // Parser executes the required functions
 void parser(vector<string> tokens){
+	insCounter.push_back(itr);
 	counter++;
 	int m=tokens.size();
 	string s0=tokens[0];
@@ -181,7 +191,7 @@ void parser(vector<string> tokens){
 		return;
 	}
 	if(operations.find(s0)==operations.end()){
-		cout<<"Invalid Instruction on line "<<(++itr)<<endl;
+		cout<<"Invalid instruction on line "<<(++itr)<<endl;
 		throwError=1;
 		return;
 	}
@@ -194,7 +204,7 @@ void parser(vector<string> tokens){
 			return;
 		}
 		if(labels.find(s1)==labels.end()){
-			cout<<"Such a label doesn't exist on line "<<(++itr)<<endl;
+			cout<<"Invalid label on line "<<(++itr)<<endl;
 			throwError=1;
 			return;
 		}
@@ -202,7 +212,8 @@ void parser(vector<string> tokens){
 			processCompletion();
 		}
 		itr=labels[s1];
-		cout <<"cycle "<<clockCycles++<<": Jumping to "<<s1<<"\n";
+		cout<<instructions[itr]<<" - "<<itr<<"\n";
+		cout <<"cycle "<<clockCycles++<<": Jumping to "<<s1<<"\n\n";
 		if (time_req ==-1 && !waitingList.empty() ){
 			processCommand(getCommand());
 		}
@@ -216,22 +227,22 @@ void parser(vector<string> tokens){
 		string s1=tokens[1];
 		string s2=tokens[2];
 		if(registers.find(s1)==registers.end()){
-			cout<<"Invalid register\n";
+			cout<<"Invalid register on line "<<(++itr)<<"\n";
 			throwError=1;
 			return;
 		}
 		if (s1== "$zero" && s0!="sw"){
-			cout << "value of $zero cannot be changed on line "<<(++itr)<<endl;
+			cout << "Value of $zero cannot be changed on line "<<(++itr)<<endl;
 			throwError=1;
 			return;
 		}
 		if(!checkAddress(s2)){
-			cout<<"Invalid format of memory address. on line "<<(++itr)<<endl;
+			cout<<"Invalid format of memory address on line "<<(++itr)<<endl;
 			throwError=1;
 			return;
 		}
 		int clock_initial = clockCycles;
-		completeRegister(extract_address(s2));
+		completeRegister(extract_reg(s2));
 		int address=locateAddress(s2);
 		if (address==-2){
 			cout <<"Only 2^20 Bytes of memory could be used on line "<<(++itr)<<endl;
@@ -255,14 +266,14 @@ void parser(vector<string> tokens){
 				processCommand(getCommand());
 			}
 		}
-
+		cout<<instructions[itr]<<" - "<<itr<<"\n";
 		if (s0=="lw" && address == last_updated_address){
 			registers[s1] = last_stored_value;
 			registerUpdate.erase(s1);
-			cout << "cycle "<< clockCycles++ << ": "<<s1<<"= "<<last_stored_value<<"; Due to forwarding; INSTR ADDR "<<"\n";
+			cout << "cycle "<< clockCycles++ << ": "<<s1<<"= "<<last_stored_value<<"; Due to forwarding;"<<"\n\n";
 		}
 		else{
-			cout << "cycle "<< clockCycles++ << ": DRAM request issued\n";
+			cout << "cycle "<< clockCycles++ << ": DRAM request issued"<<"\n\n";
 
 			if(s0=="lw"){
 				waitingList[row][col].push({counter, s1});
@@ -313,10 +324,12 @@ void parser(vector<string> tokens){
 			}
 			if(toJump==1){
 				itr=labels[s3];
-				cout <<"cycle "<<clockCycles++<<": Jumping to "<<s3<<"\n";
+				cout<<instructions[itr]<<" - "<<itr<<"\n";
+				cout <<"cycle "<<clockCycles++<<": Jumping to "<<s3<<"\n\n";
 			}
 			else{
-				cout <<"cycle "<<clockCycles++<<": No jump required to "<< s3 <<"\n";
+				cout<<instructions[itr]<<" - "<<itr<<"\n";
+				cout <<"cycle "<<clockCycles++<<": No jump required to "<< s3 <<"\n\n";
 			}
 			if (time_req ==-1 && !waitingList.empty() ){
 				processCommand(getCommand());
@@ -325,7 +338,7 @@ void parser(vector<string> tokens){
 		else if (s0=="add" || s0=="sub" || s0=="mul" || s0 == "slt" || s0=="addi"){
 
 			if (s1== "$zero"){
-				cout << "value of $zero cannot be changed on line "<<(++itr)<<endl;
+				cout << "Value of $zero cannot be changed on line "<<(++itr)<<endl;
 				throwError=1;
 				return;
 			}
@@ -346,7 +359,6 @@ void parser(vector<string> tokens){
 			if (time_req == clockCycles){
 				processCompletion();
 			}
-
 			if (clock_initial!= clockCycles){
 				if (time_req ==-1 && !waitingList.empty() ){
 					processCommand(getCommand());
@@ -358,9 +370,10 @@ void parser(vector<string> tokens){
 			else if (s0 == "slt") registers[s1]= (registers[s2]<registers[s3]);
 			else if (s0=="addi") registers[s1]=registers[s2]+stoi(s3);
 
-			cout <<"cycle "<<clockCycles++<<": "<<s1<<"= "<<registers[s1]<<"\n";
+			cout<<instructions[itr]<<" - "<<itr<<"\n";
+			cout <<"cycle "<<clockCycles++<<": "<<s1<<"= "<<registers[s1]<<"\n\n";
 			registerUpdate.erase(s1);	// Because notice that this is not a dependent instruction and can be used to ignore all the previous lw into this register
-			// Also note thatt this should not affect the "sw" operations and hence we statically passed the values to sw.
+			// Also note that this should not affect the "sw" operations and hence we statically passed the values to sw.
 			if (time_req ==-1 && !waitingList.empty() ){
 				processCommand(getCommand());
 			}
@@ -380,24 +393,29 @@ void parser(vector<string> tokens){
 }
 
 int main(int argc, char** argv){
-
-	if (argc!=4){
-		cout <<"You have to pass 4 parameters: ./assignment4.exe <file_name> <row_access_delay> <col_access_delay>\n";
-		return 0;
-	}
 	string fileName = argv[1];
 	ifstream myFile(fileName);
-	if (!check_number(argv[2]) || !check_number(argv[3])){
-		cout << "Invalid Row and Column access delay values\n";
-		return 0;
+	if (argc > 2){
+		if (argc!=4){
+			cout <<"You have to pass 4 parameters: ./assignment4.exe <file_name> <row_access_delay> <col_access_delay>\n";
+			return 0;
+		}
+		if (!check_number(argv[2]) || !check_number(argv[3])){
+			cout << "Invalid values of row and/or col access delays." << endl;
+			throwError = 1;
+			return 0;
+		}
+		else{
+			row_access_delay = stoi(argv[2]);
+			col_access_delay = stoi(argv[3]);
+		}
 	}
-	row_access_delay = stoi(argv[2]);
-	col_access_delay = stoi(argv[3]);
-	string line;
 	fillRegs();
 	fillOpers();
 
+	string line;
 	while(getline(myFile,line)){
+		//Ignoring inline comments which start with #
 		line = line.substr(0, line.find('#'));
 		vector <string> strings;
 		strings = lexer(line);
@@ -422,13 +440,13 @@ int main(int argc, char** argv){
 		if(strings.size()==1){
 			int l=strings[0].size();
 			if(strings[0][l-1]==':'){
-				// make sure it ain't the name of some operation or register
+				// Making sure the label name isn't the name of any operation or register
 				if (operations.find(strings[0].substr(0,l-1))!=operations.end() || registers.find(strings[0].substr(0,l-1))!=registers.end()){
 					cout << "A label name can't be reserved keyword on line "<<(++i)<<endl;
 					throwError =1;
 					return 0;
 				}
-				// Make sure we are not re-definig it
+				// Making sure that the same name is not given to more than one labels
 				if (labels.find(strings[0].substr(0,l-1))!=labels.end()){
 					cout << "You cannot provide more than 1 set of instructions for same label on line "<<(++i)<<endl;
 					throwError =1;
@@ -444,13 +462,13 @@ int main(int argc, char** argv){
 		}
 
 		if(strings.size()==2 && strings[1]==":"){
-			// make sure it ain't the name of some operation or register
+			// Making sure the label name isn't the name of any operation or register
 			if (operations.find(strings[0])!=operations.end() || registers.find(strings[0])!=registers.end()){
 				cout << "A label name can't be reserved keyword on line "<<(++i)<<endl;
 				throwError =1;
 				return 0;
 			}
-			// Make sure we are not re-definig it
+			// Making sure that the same name is not given to more than one labels
 			if (labels.find(strings[0])!=labels.end()){
 				cout << "You cannot provide more than 1 set of instructions for same label on line "<<(++i)<<endl;
 				throwError =1;
@@ -460,7 +478,7 @@ int main(int argc, char** argv){
 			instructions[i]=strings[0]+":";
 		}
 	}
-	cout << "Every cycle descripiton\n\n";
+	cout << "Every cycle description\n\n";
 	while(itr<n){
 		string currentLine = instructions[itr];
 		vector<string> strings;
@@ -479,6 +497,7 @@ int main(int argc, char** argv){
 	}
 	while (!waitingList.empty()){
 		processCommand(getCommand());
+		if(time_req==(-1)) break;
 		clockCycles = time_req+1;
 		processCompletion();
 	}
@@ -505,17 +524,27 @@ bool check_number(string str){
     return true;
 }
 
-// To check whether somethig is a valid memory 
+// To check whether something is a valid memory 
 bool checkAddress(string reg){
 	int n=reg.length();
 	if (check_number(reg)) return false;
 
-	if (n>=7 && reg.substr(n-7)=="($zero)") return true;
-	
+	if (n>=7 && reg.substr(n-7)=="($zero)")
+	{
+		if(!check_number(reg.substr(0,n-7))){
+			return false;
+		}
+		else{
+			return true;
+		}
+	}
 	if(n<4) return false;
 
 	if (reg[n-4]=='(' && reg[n-1]==')'){
 		string s = reg.substr(n-3,2);
+		if(!check_number(reg.substr(0,n-4))){
+			return false;
+		}
 		if(registers.find(s)!=registers.end()){
 			return true;
 		}
@@ -527,6 +556,9 @@ bool checkAddress(string reg){
 		if (n<5) return false;
 		if(reg[n-5]=='(' && reg[n-1]==')'){
 			string s = reg.substr(n-4,3);
+			if(!check_number(reg.substr(0,n-5))){
+				return false;
+			}
 			if(registers.find(s)!=registers.end()){
 				return true;
 			}
@@ -565,17 +597,17 @@ int locateAddress(string reg){
 		addr=(num+registers[second]);
 	}
 	if(addr%4!=0){
-		// because we are handling just lw and sw, in them it must be multiple of 4, in lb it could be anything
+		// because we are handling just lw and sw, the address must be a multiple of 4, in lb it could be anything
 		addr=-1;
 	}
 	if(addr>=(1<<20)){
-		// Memory out of limits must be thrown
+		// Memory out of limits
 		addr=-2;
 	}
 	return addr;
 }
 
-// Filling the 32 registers and $zero in the registrs map.
+// Filling the 32 registers and $zero in the registers map.
 void fillRegs(){
 	registers["$r0"]=0;
 	registers["$at"]=0;
@@ -607,7 +639,7 @@ void fillRegs(){
 	registers["$ra"]=0;
 }
 
-// Filling operations in the Operations map and initialised to zero. 
+// Filling operations in the operations map and initialised to zero. 
 void fillOpers(){
 	operations["add"]=0;
 	operations["sub"]=0;
@@ -622,7 +654,7 @@ void fillOpers(){
 	operations["addi"]=0;
 }
 
-// Lexer splits the string into tokens such that first 2 were space delimited in the input string and the remaining were space or tab delimited
+// Lexer splits the string into tokens such that first 2 are space delimited in the input string and the remaining are space or tab delimited
 vector<string> lexer(string line){
 	int n=line.length();
 	vector<string> v;
