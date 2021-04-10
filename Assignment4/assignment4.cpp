@@ -1,6 +1,8 @@
 #include<bits/stdc++.h>
 using namespace std;
 
+const int MAX_SIZE = 64;
+
 map<string,int> registers;
 unordered_map<string,int> operations;
 unordered_map<string,int> labels;
@@ -11,6 +13,7 @@ int throwError = 0;
 int clockCycles = 1;
 int row_buffer_updates = 0;
 int time_req = -1;	// This marks the clock cycle at which the DRAM request will complete
+int queueSize =0;
 
 tuple <string ,string, string, string, int> store;
 // {sw, clockCycles, address- address+3, value, count}
@@ -49,6 +52,7 @@ void fillOpers();
 vector<string> lexer(string line);
 void print_stats();
 
+// For getting a reqquest to run in the DRAM, the returned command is non-redundant
 tuple <int, int, int, string> getCommand(){
 	if (waitingList.empty()) return {-1,-1,-1,""};
 	int row = currRow;
@@ -61,6 +65,7 @@ tuple <int, int, int, string> getCommand(){
 	bool check2 = (check_lw && (!check1)) && (registerUpdate[reg].first != count);	// Update on register is required but not here, hence redundant operation
 	if (check_lw && (check1 || check2)){
 		waitingList[row][col].pop();
+		queueSize--;
 		if (waitingList[row][col].empty() ) waitingList[row].erase(col);
 		if (waitingList[row].empty()) waitingList.erase(row);
 		return getCommand();
@@ -107,6 +112,7 @@ void processCommand(tuple <int, int, int, string> command){
 		store  = {"lw", to_string(clockCycles), reg, to_string(buffer[col]), count};
 	}
 	waitingList[row][col].pop();
+	queueSize--;
 	if (waitingList[row][col].empty() ) waitingList[row].erase(col);
 	if (waitingList[row].empty()) waitingList.erase(row);
 }
@@ -161,6 +167,7 @@ void completeRegister(string name){
 		bool check2 = (check_lw && (!check1)) && (registerUpdate[reg].first != count);	// Update on register is required but not here, hence redundant operation
 		if (check_lw && (check1 || check2)){
 			waitingList[row][col].pop();
+			queueSize--;
 			if (waitingList[row][col].empty() ) waitingList[row].erase(col);
 			if (waitingList[row].empty()) waitingList.erase(row);
 			continue;
@@ -257,11 +264,12 @@ void parser(vector<string> tokens){
 		int col = (address%1024)/4;
 
 		if (s0 =="sw") completeRegister(s1);
-		if (clock_initial!= clockCycles){
+		if (clock_initial!= clockCycles){	// Means we stopped from completing some register
 			if (time_req ==-1 && !waitingList.empty() ){
 				processCommand(getCommand());
 			}
 		}
+		// Incase the lw gets handled by forwarding
 		if (s0=="lw" && address == last_updated_address){
 			registers[s1] = last_stored_value;
 			forRefusing[s1] = counter;
@@ -273,13 +281,28 @@ void parser(vector<string> tokens){
 			}
 			clockCycles++;
 		}
+		// Normal lw and sw instruction 
 		else{
+			if (queueSize == MAX_SIZE){
+				// We have to process one more command from waiting list, we don't have to finsih it, just need to start it's execution 
+				if (time_req != -1){	// Need to complete the ongoing work forcefully
+					clockCycles = time_req+1;
+					processCompletion();
+				}
+				processCommand(getCommand());
+			}
+			if (queueSize>=MAX_SIZE){
+				cout <<"No space in waiting list\n";
+				throwError=1;
+				return ;
+			}
 			cout << itr+1<<" => "<<instructions[itr]<<"\n";
 			cout << "cycle "<< clockCycles << ": DRAM request issued"<<"\n\n";
 			if (time_req == clockCycles){
 				processCompletion();
 			}
 			clockCycles++;
+			queueSize++;
 			if(s0=="lw"){
 				waitingList[row][col].push({counter, s1});
 				registerUpdate[s1] = {counter, address};
@@ -366,11 +389,13 @@ void parser(vector<string> tokens){
 					processCommand(getCommand());
 				}
 			}
+
 			if (s0 == "add") registers[s1]=registers[s2]+registers[s3];
 			else if (s0=="sub") registers[s1]=registers[s2]-registers[s3];
 			else if (s0 == "mul") registers[s1]=registers[s2]*registers[s3];
 			else if (s0 == "slt") registers[s1]= (registers[s2]<registers[s3]);
 			else if (s0=="addi") registers[s1]=registers[s2]+stoi(s3);
+
 			forRefusing[s1] = counter;
 			registerUpdate.erase(s1);	
 			cout << itr+1<<" => "<<instructions[itr]<<"\n";
