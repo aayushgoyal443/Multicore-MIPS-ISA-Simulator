@@ -223,14 +223,19 @@ void parser(vector<string> tokens){
 		}
 		// Incase the lw gets handled by forwarding
 		if (s0=="lw" && address == last_updated_address){
+			if (time_req == clockCycles){
+				if (get<0>(store) == "lw") clockCycles++;
+				processCompletion();
+				if (time_req ==-1 && !waitingList.empty() ){
+					processCommand(getCommand());
+				}
+			}
+
 			registers[s1] = last_stored_value;
 			forRefusing[s1] = counter;
 			registerUpdate.erase(s1);
 			cout << itr+1<<" => "<<instructions[itr]<<"\n";
 			cout << "cycle "<< clockCycles << ": "<<s1<<"= "<<last_stored_value<<" | Due to forwarding"<<"\n\n";
-			if (time_req == clockCycles){
-				processCompletion();
-			}
 			clockCycles++;
 		}
 		// Normal lw and sw instruction 
@@ -342,6 +347,14 @@ void parser(vector<string> tokens){
 				}
 			}
 
+			if (time_req == clockCycles){
+				if (get<0>(store) == "lw") clockCycles++;
+				processCompletion();
+				if (time_req ==-1 && !waitingList.empty() ){
+					processCommand(getCommand());
+				}
+			}
+
 			if (s0 == "add") registers[s1]=registers[s2]+registers[s3];
 			else if (s0=="sub") registers[s1]=registers[s2]-registers[s3];
 			else if (s0 == "mul") registers[s1]=registers[s2]*registers[s3];
@@ -352,9 +365,6 @@ void parser(vector<string> tokens){
 			registerUpdate.erase(s1);	
 			cout << itr+1<<" => "<<instructions[itr]<<"\n";
 			cout <<"cycle "<<clockCycles<<": "<<s1<<"= "<<registers[s1]<<"\n\n";
-			if (time_req == clockCycles){
-				processCompletion();
-			}	
 			clockCycles++;
 			if (time_req ==-1 && !waitingList.empty() ){
 				processCommand(getCommand());
