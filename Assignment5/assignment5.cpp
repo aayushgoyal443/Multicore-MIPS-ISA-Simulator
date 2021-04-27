@@ -223,6 +223,7 @@ void parser(vector<string> tokens){
 		}
 		// Incase the lw gets handled by forwarding
 		if (s0=="lw" && address == last_updated_address){
+<<<<<<< HEAD
 			if(time_req==clockCycles){
 				if (get<0>(store) == "lw") clockCycles++;
 				processCompletion();
@@ -230,6 +231,16 @@ void parser(vector<string> tokens){
 					processCommand(getCommand());
 				}
 			}
+=======
+			if (time_req == clockCycles){
+				if (get<0>(store) == "lw") clockCycles++;
+				processCompletion();
+				if (time_req ==-1 && !waitingList.empty() ){
+					processCommand(getCommand());
+				}
+			}
+
+>>>>>>> eb302ad8b3820b0080f264ce0670837c14f44713
 			registers[s1] = last_stored_value;
 			forRefusing[s1] = counter;
 			registerUpdate.erase(s1);
@@ -341,6 +352,14 @@ void parser(vector<string> tokens){
 			completeRegister(s2);
 			if (s0 != "addi") completeRegister(s3);
 			if (clock_initial!= clockCycles){
+				if (time_req ==-1 && !waitingList.empty() ){
+					processCommand(getCommand());
+				}
+			}
+
+			if (time_req == clockCycles){
+				if (get<0>(store) == "lw") clockCycles++;
+				processCompletion();
 				if (time_req ==-1 && !waitingList.empty() ){
 					processCommand(getCommand());
 				}
