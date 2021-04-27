@@ -1,5 +1,5 @@
-#include<bits/stdc++.h>
-#include "helper.hpp"
+#include <bits/stdc++.h>
+#include "core.hpp"
 using namespace std;
 
 // For getting a reqquest to run in the DRAM, the returned command is non-redundant
@@ -223,14 +223,18 @@ void parser(vector<string> tokens){
 		}
 		// Incase the lw gets handled by forwarding
 		if (s0=="lw" && address == last_updated_address){
+			if(time_req==clockCycles){
+				if (get<0>(store) == "lw") clockCycles++;
+				processCompletion();
+				if(!waitingList.empty()){
+					processCommand(getCommand());
+				}
+			}
 			registers[s1] = last_stored_value;
 			forRefusing[s1] = counter;
 			registerUpdate.erase(s1);
 			cout << itr+1<<" => "<<instructions[itr]<<"\n";
 			cout << "cycle "<< clockCycles << ": "<<s1<<"= "<<last_stored_value<<" | Due to forwarding"<<"\n\n";
-			if (time_req == clockCycles){
-				processCompletion();
-			}
 			clockCycles++;
 		}
 		// Normal lw and sw instruction 
@@ -348,13 +352,18 @@ void parser(vector<string> tokens){
 			else if (s0 == "slt") registers[s1]= (registers[s2]<registers[s3]);
 			else if (s0=="addi") registers[s1]=registers[s2]+stoi(s3);
 
+			if(time_req==clockCycles){
+				if (get<0>(store) == "lw") clockCycles++;
+				processCompletion();
+				if(!waitingList.empty()){
+					processCommand(getCommand());
+				}
+			}
+
 			forRefusing[s1] = counter;
 			registerUpdate.erase(s1);	
 			cout << itr+1<<" => "<<instructions[itr]<<"\n";
 			cout <<"cycle "<<clockCycles<<": "<<s1<<"= "<<registers[s1]<<"\n\n";
-			if (time_req == clockCycles){
-				processCompletion();
-			}	
 			clockCycles++;
 			if (time_req ==-1 && !waitingList.empty() ){
 				processCommand(getCommand());
@@ -383,8 +392,8 @@ int main(int argc, char** argv){
 
 	// Start running the file
 	cout << "Every cycle description\n\n";
-	while(itr< instructions.size() ){
-		string currentLine = instructions[itr];
+	while(cores[currentCore]->itr< cores[currentCore]->instructions.size() ){
+		string currentLine = cores[currentCore]->instructions[cores[currentCore]->itr];
 		vector<string> strings;
 
 		strings=lexer(currentLine);
@@ -408,7 +417,262 @@ int main(int argc, char** argv){
 
 	if (currRow!=-1) DRAM[currRow] = buffer;
 
-	print_stats();
+	cores[currentCore]->print_stats();
 
 	return 0;
+}
+
+/*********************** Function defintions *********************/
+
+// To initialize data according to N cores.
+void initialize(int argc, char** argv)
+{
+	if(!check_number(argv[1])){
+		"Invalid value for number of cores.\n";
+		throwError = 1;
+		return;
+	}
+	int N = stoi(argv[1]);
+
+	if (argc == N+4){
+		if(!check_number(argv[N+2]) || !check_number(argv[N+3])){
+			cout<<"Invalid value of delays.\n";
+			throwError = 1;
+			return;
+		}
+		row_access_delay = stoi(argv[N+2]);
+		col_access_delay = stoi(argv[N+3]);
+	}else{
+		cout<<"Provide appropriate number of arguments.\n";
+		throwError=1;
+		return;
+	}
+
+	for(int i=2;i<N+2;i++){
+		// Reading command line arguments
+		string fileName = argv[i];
+		cores.push_back(new Core(fileName));
+	}
+
+}
+
+// To check if a string denotes a integer or not
+bool check_number(string str)
+{
+	if (str.length() == 0)
+		return true;
+	if (!isdigit(str[0]))
+	{
+		if (str[0] != '-' && str[0] != '+')
+		{
+			return false;
+		}
+	}
+	for (int i = 1; i < str.length(); i++)
+		if (isdigit(str[i]) == false)
+			return false;
+	return true;
+}
+
+// To extract a potentially unsafe register from the address in an lw instruction
+string extract_reg(string reg)
+{
+	int n = reg.length();
+	string second = reg.substr(n - 4, 3);
+	if (n >= 7 && reg.substr(n - 7) == "($zero)")
+	{
+		second = reg.substr(n - 6, 5);
+	}
+	else if (reg[n - 4] == '(' && reg[n - 1] == ')')
+	{
+		second = reg.substr(n - 3, 2);
+	}
+	return second;
+}
+
+// Lexer splits the string into tokens such that first 2 are space delimited in the input string and the remaining are space or tab delimited
+vector<string> lexer(string line)
+{
+	int n = line.length();
+	vector<string> v;
+	bool first = false;
+	bool second = false;
+	string s = "";
+	int i = 0;
+	while (i < n)
+	{
+		if (first)
+		{
+			if (second)
+			{
+				if (line[i] == ',')
+				{
+					v.push_back(s);
+					s = "";
+					i++;
+					while (line[i] == ' ' || line[i] == '\t')
+					{
+						if (i < n)
+						{
+							i++;
+						}
+						else
+						{
+							break;
+						}
+					}
+				}
+				else
+				{
+					if (line[i] != ' ' && line[i] != '\t')
+						s += line[i];
+					i++;
+				}
+			}
+			else
+			{
+				if (line[i] == ' ' || line[i] == '\t')
+				{
+					second = true;
+					v.push_back(s);
+					s = "";
+					while (line[i] == ' ' || line[i] == '\t')
+					{
+						if (i < n)
+						{
+							i++;
+						}
+						else
+						{
+							break;
+						}
+					}
+				}
+				else
+				{
+					s += line[i];
+					i++;
+				}
+			}
+		}
+		else
+		{
+			if (line[i] != ' ' && line[i] != '\t')
+			{
+				first = true;
+				s += line[i];
+			}
+			i++;
+		}
+	}
+	if (s != "")
+		v.push_back(s);
+	return v;
+}
+
+// To check whether something is a valid memory
+bool checkAddress(string reg)
+{
+    int n = reg.length();
+    if (check_number(reg))
+        return false;
+
+    if (n >= 7 && reg.substr(n - 7) == "($zero)")
+    {
+        if (!check_number(reg.substr(0, n - 7)))
+        {
+            return false;
+        }
+        else
+        {
+            return true;
+        }
+    }
+    if (n < 4)
+        return false;
+
+    if (reg[n - 4] == '(' && reg[n - 1] == ')')
+    {
+        string s = reg.substr(n - 3, 2);
+        if (!check_number(reg.substr(0, n - 4)))
+        {
+            return false;
+        }
+        if (registers.find(s) != registers.end())
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+    else
+    {
+        if (n < 5)
+            return false;
+        if (reg[n - 5] == '(' && reg[n - 1] == ')')
+        {
+            string s = reg.substr(n - 4, 3);
+            if (!check_number(reg.substr(0, n - 5)))
+            {
+                return false;
+            }
+            if (registers.find(s) != registers.end())
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        else
+        {
+            return false;
+        }
+    }
+}
+
+// To get the memory address from a string
+int locateAddress(string reg)
+{
+    int addr;
+    int n = reg.length();
+    if (check_number(reg))
+    {
+        addr = stoi(reg);
+    }
+    else
+    {
+        int num = 0;
+        string first = reg.substr(0, n - 5);
+        string second = reg.substr(n - 4, 3);
+        if (n >= 7 && reg.substr(n - 7) == "($zero)")
+        {
+            first = reg.substr(0, n - 7);
+            second = reg.substr(n - 6, 5);
+        }
+        else if (reg[n - 4] == '(' && reg[n - 1] == ')')
+        {
+            first = reg.substr(0, n - 4);
+            second = reg.substr(n - 3, 2);
+        }
+        if (first != "")
+        {
+            num = stoi(first);
+        }
+        addr = (num + registers[second]);
+    }
+    if (addr % 4 != 0)
+    {
+        // because we are handling just lw and sw, the address must be a multiple of 4, in lb it could be anything
+        addr = -1;
+    }
+    if (addr >= (1 << 20))
+    {
+        // Memory out of limits
+        addr = -2;
+    }
+    return addr;
 }
