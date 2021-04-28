@@ -403,10 +403,10 @@ int main(int argc, char** argv){
 			if (cores[i]->error ==0) all_error= false;
 		}
 		for (int i=0;i<N;i++){
-			if (cores[i]->itr < cores[i]->instructions.size()) all_done = false;
+			if (cores[i]->error ==0 && cores[i]->itr < cores[i]->instructions.size()) all_done = false;
 		}
 		if (all_error || throwError==1){
-			cout <<"\nError in all the files\n";
+			if (all_error) cout <<"\nError in all the files\n";
 			return 0;
 		}
 		if (all_done){
