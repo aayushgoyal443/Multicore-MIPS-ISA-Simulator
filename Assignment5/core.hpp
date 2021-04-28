@@ -62,11 +62,12 @@ int col_access_delay = 2;
 
 /*********************** Helper functions ***********************/
 void initialize(int argc, char** argv);
+void initialize_short(int argc, char** argv);
 bool check_number(string str);
 string extract_reg(string reg);
 vector<string> lexer(string line);
 bool checkAddress(string reg);
-int locateAddress(string reg);
+int locateAddress(string reg, int i);
 void print_stats();
 
 /*********************** Function Definitions ***********************/
@@ -255,9 +256,7 @@ void print_stats()
 
     cout << "\nTotal number of row buffer updates: " << row_buffer_updates << "\n";
     if (currRow != -1)
-        cout << "Total number of cycles: " << --DRAMclock << " + " << row_access_delay << " (cycles taken for code execution + final writeback delay)\n";
-    else
-        cout << "Total number of cycles: " << --DRAMclock << " (cycles taken for code execution)\n";
+		cout << row_access_delay << " extra cycles taken for final writeback.\n";
 }
 
 void initialize_short(int argc, char** argv){
@@ -489,10 +488,10 @@ bool checkAddress(string reg)
 }
 
 // To get the memory address from a string
-int locateAddress(string reg)
+int locateAddress(string reg, int i)
 {
     int addr;
-    Core dummy = Core();
+    Core dummy = *cores[i];
     int n = reg.length();
     if (check_number(reg))
     {
