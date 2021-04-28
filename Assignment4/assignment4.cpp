@@ -273,9 +273,10 @@ void parser(vector<string> tokens){
 		if (s0=="lw" && address == last_updated_address){
 
 			if (time_req == clockCycles){
-				if (get<0>(store) == "lw") clockCycles++;
+				bool did_lw = (get<0>(store) == "lw");
+				if (did_lw) clockCycles++;
 				processCompletion();
-				if (time_req ==-1 && !waitingList.empty() ){
+				if (did_lw && time_req ==-1 && !waitingList.empty() ){
 					processCommand(getCommand());
 				}
 			}
@@ -397,9 +398,10 @@ void parser(vector<string> tokens){
 			}
 
 			if (time_req == clockCycles){
-				if (get<0>(store) == "lw") clockCycles++;
+				bool did_lw = (get<0>(store) == "lw");
+				if (did_lw) clockCycles++;
 				processCompletion();
-				if (time_req ==-1 && !waitingList.empty() ){
+				if (did_lw && time_req ==-1 && !waitingList.empty() ){
 					processCommand(getCommand());
 				}
 			}
