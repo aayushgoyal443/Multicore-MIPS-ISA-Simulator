@@ -38,6 +38,8 @@ tuple<string, string, string, string, int> store;
 // {sw, clockCycles, address- address+3, value, count}
 // {lw, clockCycles, register name, value, count}
 
+int DRAMclock =1;
+pair<bool, int> didlw ={false, 1};
 int currRow = -1; //row number of current row buffer
 int row_buffer_updates = 0;
 int time_req = -1; // This marks the clock cycle at which the DRAM request will complete
@@ -480,8 +482,4 @@ void print_stats()
 	}
 
 	cout << "\nTotal number of row buffer updates: " << row_buffer_updates << "\n";
-	if (currRow != -1)
-		cout << "Total number of cycles: " << --clockCycles << " + " << row_access_delay << " (cycles taken for code execution + final writeback delay)\n";
-	else
-		cout << "Total number of cycles: " << --clockCycles << " (cycles taken for code execution)\n";
 }
