@@ -2,6 +2,8 @@
 using namespace std;
 
 int throwError = 0;
+map <pair<int, int>, map<int,string>> print;
+// [ending cycle][-1 * starting cycle][core] = the string to be printed;
 
 class Core{
 
@@ -118,20 +120,20 @@ void Core::fillIns(string fileName){
             if(strings[0][l-1]==':'){
                 // Making sure the label name isn't the name of any operation or register
                 if (operations.find(strings[0].substr(0,l-1))!=operations.end() || registers.find(strings[0].substr(0,l-1))!=registers.end()){
-                    cout << "A label name can't be reserved keyword on line "<<(++i)<<endl;
+                    cout<<"Core \""<<fileName<<"\": A label name can't be reserved keyword on line "<<(++i)<<endl;
                     error =1;
                     return;
                 }
                 // Making sure that the same name is not given to more than one labels
                 if (labels.find(strings[0].substr(0,l-1))!=labels.end()){
-                    cout << "You cannot provide more than 1 set of instructions for same label on line "<<(++i)<<endl;
+                    cout<<"Core \""<<fileName<<"\": You cannot provide more than 1 set of instructions for same label on line "<<(++i)<<endl;
                     error =1;
                     return;
                 }
                 labels[strings[0].substr(0,l-1)]=i;
             }
             else{
-                cout<<"Colon required at the end of label on line "<<(++i)<<endl;
+                cout<<"Core \""<<fileName<<"\": Colon required at the end of label on line "<<(++i)<<endl;
                 error=1;
                 return;
             }
@@ -140,13 +142,13 @@ void Core::fillIns(string fileName){
         if(strings.size()==2 && strings[1]==":"){
             // Making sure the label name isn't the name of any operation or register
             if (operations.find(strings[0])!=operations.end() || registers.find(strings[0])!=registers.end()){
-                cout << "A label name can't be reserved keyword on line "<<(++i)<<endl;
+                cout<<"Core \""<<fileName<<"\": A label name can't be reserved keyword on line "<<(++i)<<endl;
                 error =1;
                 return;
             }
             // Making sure that the same name is not given to more than one labels
             if (labels.find(strings[0])!=labels.end()){
-                cout << "You cannot provide more than 1 set of instructions for same label on line "<<(++i)<<endl;
+                cout<<"Core \""<<fileName<<"\": You cannot provide more than 1 set of instructions for same label on line "<<(++i)<<endl;
                 error =1;
                 return;
             }
@@ -227,6 +229,18 @@ void Core::fillOpers()
 void print_stats()
 {
 
+    cout <<"Every cycle description:\n\n";
+    for (auto p: print){
+        int start = -1*p.first.second;
+        int end = p.first.first;
+        if (start == end) cout <<"Cycle "<<start<<":\n";
+        else cout <<"Cycle "<<start<<"-"<<end<<":\n";
+        for (auto u : p.second){
+            cout <<"Core "<< u.first+1<<": "<<u.second;
+        }
+        cout <<"\n";
+    }
+
     cout << "\nNon-zero values in the memory at the end of the execution:\n\n";
     int addr;
     for (int i = 0; i < 1024; i++)
@@ -243,7 +257,7 @@ void print_stats()
 
     cout << "\nNon-zero values in registers at the end of execution:\n\n";
     for (int i=0 ;i<N;i++){
-        cout <<"For "<<i<<"th core:\n";
+        cout <<"For "<<i+1<<"th core:\n";
         for (auto u : cores[i]->registers)
         {
             if (u.second != 0)

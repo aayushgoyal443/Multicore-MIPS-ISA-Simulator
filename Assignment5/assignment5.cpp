@@ -74,19 +74,19 @@ void processCommand(tuple <int, int, int, string, int> command){
 
 // This marks the end of a process running in the DRAM 
 void processCompletion(){
-	int count = get<4>(store);
+	stringstream buffercout;
+    int count = get<4>(store);
 	int i  = get<5>(store);
 	string reg = get<2>(store);
-	cout <<"Core "<<i<<": ";
-	cout << to_string(cores[i]->insCounter[count-1]+1) +" => " +cores[i]->instructions[cores[i]->insCounter[count-1]]+"\n";
-	cout << "cycle " + get<1>(store) + "-" + to_string(time_req)+": ";
+	buffercout << to_string(cores[i]->insCounter[count-1]+1) +" => " +cores[i]->instructions[cores[i]->insCounter[count-1]]+"; ";
 	if (get<0>(store)=="lw"){
-		if (cores[i]->forRefusing[reg] > count) cout << "Rejected by processor, "<< reg<< " already updated in procesor\n\n";
-		else  cout << reg + "= " + get<3>(store) + "\n\n";
+		if (cores[i]->forRefusing[reg] > count) buffercout << "Rejected by processor, "<< reg<< " already updated in procesor\n";
+		else  buffercout << reg + "= " + get<3>(store) + "\n";
 	}
 	else{
-		cout << "Memory address " + reg + "= " + get<3>(store) + "\n\n";
+		buffercout << "Memory address " + reg + "= " + get<3>(store) + "\n";
 	}
+	print[{stoi(to_string(time_req)),-1*stoi(get<1>(store))}][i] = buffercout.str();
 	time_req =-1;
 	store = tuple <string ,string, string, string, int, int>();
 }
@@ -146,7 +146,7 @@ void parser(vector<string> tokens, int i){
 	int m=tokens.size();
 	string s0=tokens[0];
 	if(m>4){
-		cout<<"Core "<<i<<": Syntax Error on line "<<(++cores[i]->itr)<<endl;
+		cout<<"Core "<<i+1<<": Syntax Error on line "<<(++cores[i]->itr)<<endl;
 		cores[i]->error =1;
 		return;
 	}
@@ -155,9 +155,8 @@ void parser(vector<string> tokens, int i){
         if (cores[i]->itr < cores[i]->instructions.size()) parser(lexer(cores[i]->instructions[cores[i]->itr]), i);
 		return;
 	}
-	cout <<"Core "<<i<<": ";
 	if(cores[i]->operations.find(s0)==cores[i]->operations.end()){
-		cout<<"Invalid instruction on line "<<(++cores[i]->itr)<<endl;
+		cout<<"Core "<<i+1<<": Invalid instruction on line "<<(++cores[i]->itr)<<endl;
 		cores[i]->error=1;
 		return;
 	}
@@ -165,40 +164,42 @@ void parser(vector<string> tokens, int i){
 	if(m==2){
 		string s1=tokens[1];
 		if (s0!="j"){
-			cout <<"Invalid instruction on line "<<(++cores[i]->itr)<<endl;
+			cout<<"Core "<<i+1<<": Invalid instruction on line "<<(++cores[i]->itr)<<endl;
 			cores[i]->error =1;
 			return;
 		}
 		if(cores[i]->labels.find(s1)==cores[i]->labels.end()){
-			cout<<"Invalid label on line "<<(++cores[i]->itr)<<endl;
+			cout<<"Core "<<i+1<<": Invalid label on line "<<(++cores[i]->itr)<<endl;
 			cores[i]->error=1;
 			return;
 		}
 		cores[i]->itr=cores[i]->labels[s1];
-		cout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"\n";
-		cout <<"cycle "<<cores[i]->clockCycles<<": Jumping to "<<s1<<"\n\n";
+		stringstream buffercout;
+		buffercout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"; ";
+		buffercout <<"Jumping to "<<s1<<"\n";
+		print[{cores[i]->clockCycles, -1*cores[i]->clockCycles}][i] = buffercout.str();
 		cores[i]->clockCycles++;
 	}
 	else if(m==3){
 		if (s0 != "lw" && s0!="sw"){
-			cout<<"Invalid instruction on line "<<(++cores[i]->itr)<<endl;
+			cout<<"Core "<<i+1<<": Invalid instruction on line "<<(++cores[i]->itr)<<endl;
 			cores[i]->error=1;
 			return;
 		}
 		string s1=tokens[1];
 		string s2=tokens[2];
 		if(cores[i]->registers.find(s1)==cores[i]->registers.end()){
-			cout<<"Invalid register on line "<<(++cores[i]->itr)<<"\n";
+			cout<<"Core "<<i+1<<": Invalid register on line "<<(++cores[i]->itr)<<"\n";
 			cores[i]->error=1;
 			return;
 		}
 		if (s1== "$zero" && s0!="sw"){
-			cout << "Value of $zero cannot be changed on line "<<(++cores[i]->itr)<<endl;
+			cout<<"Core "<<i+1<<": Value of $zero cannot be changed on line "<<(++cores[i]->itr)<<endl;
 			cores[i]->error=1;
 			return;
 		}
 		if(!checkAddress(s2)){
-			cout<<"Invalid format of memory address on line "<<(++cores[i]->itr)<<endl;
+			cout<<"Core "<<i+1<<": Invalid format of memory address on line "<<(++cores[i]->itr)<<endl;
 			cores[i]->error=1;
 			return;
 		}
@@ -206,12 +207,12 @@ void parser(vector<string> tokens, int i){
 		completeRegister(extract_reg(s2), i);
 		int address=locateAddress(s2, i);
 		if (address==-2){
-			cout <<"Only 2^20 Bytes of memory could be used on line "<<(++cores[i]->itr)<<endl;
+			cout<<"Core "<<i+1<<": Only 2^20 Bytes of memory could be used on line "<<(++cores[i]->itr)<<endl;
 			cores[i]->error=1;
 			return;
 		}
 		if(address<0){
-			cout<<"Unaligned memory address on line "<<(++cores[i]->itr)<<endl;
+			cout<<"Core "<<i+1<<": Unaligned memory address on line "<<(++cores[i]->itr)<<endl;
 			cores[i]->error=1;
 			return;
 		}
@@ -236,8 +237,10 @@ void parser(vector<string> tokens, int i){
 			cores[i]->registers[s1] = cores[i]->last_stored_value;
 			cores[i]->forRefusing[s1] = cores[i]->counter;
 			cores[i]->registerUpdate.erase(s1);
-			cout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"\n";
-			cout << "cycle "<< cores[i]->clockCycles << ": "<<s1<<"= "<<cores[i]->last_stored_value<<" | Due to forwarding"<<"\n\n";
+			stringstream buffercout;
+			buffercout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"; ";
+			buffercout << s1<<"= "<<cores[i]->last_stored_value<<"; Due to forwarding"<<"\n";
+			print[{cores[i]->clockCycles, -1*cores[i]->clockCycles}][i] = buffercout.str();
 			cores[i]->clockCycles++;
 		}
 		// Normal lw and sw instruction 
@@ -257,8 +260,10 @@ void parser(vector<string> tokens, int i){
 				throwError=1;
 				return ;
 			}
-			cout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"\n";
-			cout << "cycle "<< cores[i]->clockCycles << ": DRAM request issued"<<"\n\n";
+			stringstream buffercout;
+			buffercout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"; ";
+			buffercout << "DRAM request issued"<<"\n";
+			print[{cores[i]->clockCycles, -1*cores[i]->clockCycles}][i] = buffercout.str();
 			cores[i]->clockCycles++;
 			queueSize++;
 			if(s0=="lw"){
@@ -277,13 +282,13 @@ void parser(vector<string> tokens, int i){
 		string s2=tokens[2];
 		string s3=tokens[3];
 		if (cores[i]->registers.find(s1)==cores[i]->registers.end() || cores[i]->registers.find(s2)==cores[i]->registers.end()){
-			cout<<"Invalid register on line "<<(++cores[i]->itr)<<endl;
+			cout<<"Core "<<i+1<<": Invalid register on line "<<(++cores[i]->itr)<<endl;
 			cores[i]->error=1;
 			return;
 		}
 		if(s0=="beq" || s0=="bne"){
 			if(cores[i]->labels.find(s3)==cores[i]->labels.end()){
-				cout<<"Invalid label on line "<<(++cores[i]->itr)<<endl;
+				cout<<"Core "<<i+1<<": Invalid label on line "<<(++cores[i]->itr)<<endl;
 				cores[i]->error=1;
 				return;
 			}
@@ -301,30 +306,32 @@ void parser(vector<string> tokens, int i){
 			else if (s0 == "bne" && cores[i]->registers[s1]!=cores[i]->registers[s2]){
 				toJump = 1;
 			}
-			cout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"\n";
+			stringstream buffercout;
+			buffercout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"; ";
 			if(toJump==1){
 				cores[i]->itr=cores[i]->labels[s3];
-				cout <<"cycle "<<cores[i]->clockCycles<<": Jumping to "<<s3<<"\n\n";
+				buffercout <<"Jumping to "<<s3<<"\n";
 			}
 			else{
-				cout <<"cycle "<<cores[i]->clockCycles<<": No jump required to "<< s3 <<"\n\n";
+				buffercout <<"No jump required to "<< s3 <<"\n";
 			}
+			print[{cores[i]->clockCycles, -1*cores[i]->clockCycles}][i] = buffercout.str();
 			cores[i]->clockCycles++;
 		}
 		else if (s0=="add" || s0=="sub" || s0=="mul" || s0 == "slt" || s0=="addi"){
 
 			if (s1== "$zero"){
-				cout << "Value of $zero cannot be changed on line "<<(++cores[i]->itr)<<endl;
+				cout<<"Core "<<i+1<<": Value of $zero cannot be changed on line "<<(++cores[i]->itr)<<endl;
 				cores[i]->error=1;
 				return;
 			}
 			if(s0!= "addi" && cores[i]->registers.find(s3)==cores[i]->registers.end()){
-				cout<<"Invalid register on line "<<(++cores[i]->itr)<<endl;
+				cout<<"Core "<<i+1<<": Invalid register on line "<<(++cores[i]->itr)<<endl;
 				cores[i]->error=1;
 				return;
 			}
 			if(s0=="addi" && !check_number(s3)){
-				cout<<"Immediate value is not an integer on line "<<(++cores[i]->itr)<<endl;
+				cout<<"Core "<<i+1<<": Immediate value is not an integer on line "<<(++cores[i]->itr)<<endl;
 				cores[i]->error=1;
 				return;
 			}
@@ -352,13 +359,15 @@ void parser(vector<string> tokens, int i){
 
 			cores[i]->forRefusing[s1] = cores[i]->counter;
 			cores[i]->registerUpdate.erase(s1);	
-			cout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"\n";
-			cout <<"cycle "<<cores[i]->clockCycles<<": "<<s1<<"= "<<cores[i]->registers[s1]<<"\n\n";
+			stringstream buffercout;
+			buffercout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"; ";
+			buffercout <<s1<<"= "<<cores[i]->registers[s1]<<"\n";
+			print[{cores[i]->clockCycles, -1*cores[i]->clockCycles}][i] = buffercout.str();
 			cores[i]->clockCycles++;
 		}
 		
 		else{
-			cout<<"Invalid instruction on line "<<(++cores[i]->itr)<<endl;
+			cout<<"Core "<<i+1<<": Invalid instruction on line "<<(++cores[i]->itr)<<endl;
 			cores[i]->error=1;
 			return;
 		}
@@ -378,7 +387,6 @@ int main(int argc, char** argv){
 	}
 
 	// Start running the file
-	cout << "Every cycle description\n\n";
 	while(true){
 		didlw = {false, 1};
         if (time_req == DRAMclock){
@@ -431,9 +439,6 @@ int main(int argc, char** argv){
 	if (currRow!=-1) DRAM[currRow] = buffer;
 
 	print_stats();
-
-    if (currRow != -1)
-		cout << row_access_delay << " extra cycles taken for final writeback.\n";
 
 	return 0;
 }
