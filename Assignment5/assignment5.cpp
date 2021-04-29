@@ -110,6 +110,7 @@ void completeRegister(string name, int i){
 		DRAMclock = time_req+1;
 		processCompletion();
 	}
+	else if (just_did) ++DRAMclock;
 
 	// Complete that [row][col]
 	int count_req = cores[i]->registerUpdate[name].first;
@@ -249,10 +250,6 @@ void parser(vector<string> tokens, int i){
 				DRAMclock++;
 				processCommand(getCommand());				
 			}
-<<<<<<< HEAD
-=======
-
->>>>>>> 151a886f09612271fd68e52584ba84f096a6d978
 			cores[i]->registers[s1] = get<1>(cores[i]->last_sw);
 			cores[i]->forRefusing[s1] = cores[i]->counter;
 			cores[i]->registerUpdate.erase(s1);
@@ -272,6 +269,7 @@ void parser(vector<string> tokens, int i){
 					cores[i]->clockCycles = DRAMclock;
 					didlw.first = false;
 				}
+				else if (just_did) DRAMclock++;
 				processCommand(getCommand());
 			}
 			if (queueSize>=MAX_SIZE){
@@ -406,11 +404,13 @@ int main(int argc, char** argv){
 	// Start running the file
 	while(true){
 		didlw = {false, 1};
+		just_did = false;
         if (time_req == DRAMclock){
 			if (get<0>(store) == "lw"){
 				didlw.first = true;
 				didlw.second = get<5>(store);
 			}
+			just_did = true;
             processCompletion();
         }
 

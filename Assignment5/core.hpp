@@ -4,7 +4,6 @@ using namespace std;
 int throwError = 0;
 map <pair<int, int>, map<int,string>> print;
 // [ending cycle][-1 * starting cycle][core] = the string to be printed;
-map<int, int> address_core; // [address] = core in which it was accessed, 0 if never accessed
 
 class Core{
 
@@ -63,6 +62,8 @@ int row_buffer_updates = 0;
 int time_req = -1; // This marks the clock cycle at which the DRAM request will complete
 int row_access_delay = 10;        
 int col_access_delay = 2;
+map<int, int> address_core; // [address] = core in which it was accessed, 0 if never accessed
+bool just_did = false;  // When we just did a instruction by (time_req == DRAMclock)
 
 /*********************** Helper functions ***********************/
 void initialize(int argc, char** argv);
