@@ -4,6 +4,7 @@ using namespace std;
 int throwError = 0;
 map <pair<int, int>, map<int,string>> print;
 // [ending cycle][-1 * starting cycle][core] = the string to be printed;
+map<int, int> address_core; // [address] = core in which it was accessed, 0 if never accessed
 
 class Core{
 

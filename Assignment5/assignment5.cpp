@@ -1,4 +1,3 @@
-// TODO: Checking whether all the cores are accessing disjoint memory only
 // TODO: Making the request manager is left
 // TODO: Capping the simulation time with M is left
 #include<bits/stdc++.h>
@@ -222,6 +221,12 @@ void parser(vector<string> tokens, int i){
 		}
 		int row = address/1024;
 		int col = (address%1024)/4;
+		if ( address_core.find(address)!= address_core.end() && address_core[address] != i+1){
+			cout<<"Core "<<i+1<<": Memory address "<<address<<" already accessed in core "<<address_core[address]<<", error on line"<<(++cores[i]->itr)<<endl;
+			cores[i]->error=1;
+			return;
+		}
+		address_core[address] =i+1;
 
 		if (s0 =="sw") completeRegister(s1, i);
 		if (clock_initial!= DRAMclock){	// Means we stopped from completing some register
