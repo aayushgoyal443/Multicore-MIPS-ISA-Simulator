@@ -18,8 +18,7 @@ class Core{
         
         int itr=0;
         int counter=0;
-        int last_updated_address = -1;
-        int last_stored_value = 0;
+        tuple <int, int, int> last_sw= {-1,0,-1};  // {address, value, count}
         int clockCycles = 1;
         int error=0;
         Core();
