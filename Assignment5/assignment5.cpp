@@ -221,6 +221,12 @@ void parser(vector<string> tokens, int i){
 		}
 		int row = address/1024;
 		int col = (address%1024)/4;
+		if ( address_core.find(address)!= address_core.end() && address_core[address] != i+1){
+			cout<<"Core "<<i+1<<": Memory address "<<address<<" already accessed in core "<<address_core[address]<<", error on line"<<(++cores[i]->itr)<<endl;
+			cores[i]->error=1;
+			return;
+		}
+		address_core[address] =i+1;
 
 		if ( address_core.find(address)!= address_core.end() && address_core[address] != i+1){
 			cout<<"Core "<<i+1<<": Memory address "<<address<<" already accessed in core "<<address_core[address]<<", error on line"<<(++cores[i]->itr)<<endl;
@@ -243,6 +249,10 @@ void parser(vector<string> tokens, int i){
 				DRAMclock++;
 				processCommand(getCommand());				
 			}
+<<<<<<< HEAD
+=======
+
+>>>>>>> 151a886f09612271fd68e52584ba84f096a6d978
 			cores[i]->registers[s1] = get<1>(cores[i]->last_sw);
 			cores[i]->forRefusing[s1] = cores[i]->counter;
 			cores[i]->registerUpdate.erase(s1);
