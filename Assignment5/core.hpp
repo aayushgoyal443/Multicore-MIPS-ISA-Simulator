@@ -4,6 +4,7 @@ using namespace std;
 int throwError = 0;
 map <pair<int, int>, map<int,string>> print;
 // [ending cycle][-1 * starting cycle][core] = the string to be printed;
+map<int, int> address_core; // [address] = core in which it was accessed, 0 if never accessed
 
 class Core{
 
@@ -18,18 +19,19 @@ class Core{
         
         int itr=0;
         int counter=0;
-        int last_updated_address = -1;
-        int last_stored_value = 0;
+        tuple <int, int, int> last_sw= {-1,0,-1};  // {address, value, count}
         int clockCycles = 1;
         int error=0;
+
         Core();
         Core(string fileName);
 
     private:
         void fillIns(string fileName);
-        void fillRegs();
-        void fillOpers();
 
+        void fillRegs();
+
+        void fillOpers();
 };
 
 int N = 1;	// N cores
@@ -59,12 +61,13 @@ pair<bool, int> didlw ={false, 1};  // This will store, whether lw was last perf
 int currRow = -1; //row number of current row buffer
 int row_buffer_updates = 0;
 int time_req = -1; // This marks the clock cycle at which the DRAM request will complete
-int row_access_delay = 10;
+int row_access_delay = 10;        
 int col_access_delay = 2;
 
 /*********************** Helper functions ***********************/
 void initialize(int argc, char** argv);
-void initialize_short(int argc, char** argv);
+void initialize_short(int N, string folder);
+void initialize_long(int N,char** argv);
 bool check_number(string str);
 string extract_reg(string reg);
 vector<string> lexer(string line);
@@ -86,7 +89,7 @@ Core::Core(string fileName){
     fillOpers();
     fillIns(fileName);
 }
- 
+
 void Core::fillIns(string fileName){
     // For filling the instructions vector
     string line;
@@ -273,14 +276,19 @@ void print_stats()
 		cout << row_access_delay << " extra cycles taken for final writeback.\n";
 }
 
-void initialize_short(int argc, char** argv){
-    N = stoi(argv[1]);
-    MAX_TIME = stoll(argv[2]);
-    string folder  = argv[3];
+void initialize_short(int N, string folder){
     for (int i=0;i<N;i++){
         string filename = folder +"/"+to_string(i);
         cores.push_back(new Core(filename));
     }
+}
+
+void initialize_long(int N,char** argv){
+    for(int i=0;i<N;i++){
+		// Reading command line arguments
+		string fileName = argv[i+3];
+		cores.push_back(new Core(fileName));
+	}
 }
 
 // To initialize data according to N cores.
@@ -299,25 +307,34 @@ void initialize(int argc, char** argv)
 	N = stoi(argv[1]);
 	MAX_TIME = stoll(argv[2]);
 
-    if (argc == N+5){
-		if(!check_number(argv[N+3]) || !check_number(argv[N+4])){
+    if (argc == 6){
+		if(!check_number(argv[4]) || !check_number(argv[5])){
+			cout<<"Invalid value of delays.\n";
+			throwError = 1;
+			return;
+		}
+		row_access_delay = stoi(argv[4]);
+		col_access_delay = stoi(argv[5]);
+        if(N==1){
+            initialize_long(1,argv);
+        }else{
+            initialize_short(N,argv[3]);
+        }
+	}
+    else if(argc == N+5){
+        if(!check_number(argv[N+3]) || !check_number(argv[N+4])){
 			cout<<"Invalid value of delays.\n";
 			throwError = 1;
 			return;
 		}
 		row_access_delay = stoi(argv[N+3]);
 		col_access_delay = stoi(argv[N+4]);
-	}
+        initialize_long(N,argv);
+    }
     else if (argc != N+3){
 		cout<<"Provide appropriate number of arguments.\n";
 		throwError=1;
 		return;
-	}
-
-	for(int i=3;i<N+3;i++){
-		// Reading command line arguments
-		string fileName = argv[i];
-		cores.push_back(new Core(fileName));
 	}
 
 }

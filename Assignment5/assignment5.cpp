@@ -17,6 +17,9 @@ tuple <int, int, int, string, int> getCommand(){
 	bool check_lw = (!check_number(reg));	// true if "lw" operation
 	bool check1 = check_lw && (cores[i]->registerUpdate.find(reg)== cores[i]->registerUpdate.end());	// means load on that register is not required, hence redundant operation
 	bool check2 = (check_lw && (!check1)) && (cores[i]->registerUpdate[reg].first != count);	// Update on register is required but not here, hence redundant operation
+	if (!check_lw){
+		if (count == get<2>(cores[i]->last_sw) ) cores[i]->last_sw = {-1,0,-1};
+	}
 	if (check_lw && (check1 || check2)){
 		waitingList[row][col].pop();
 		queueSize--;
@@ -219,6 +222,13 @@ void parser(vector<string> tokens, int i){
 		int row = address/1024;
 		int col = (address%1024)/4;
 
+		if ( address_core.find(address)!= address_core.end() && address_core[address] != i+1){
+			cout<<"Core "<<i+1<<": Memory address "<<address<<" already accessed in core "<<address_core[address]<<", error on line"<<(++cores[i]->itr)<<endl;
+			cores[i]->error=1;
+			return;
+		}
+		address_core[address] =i+1;
+
 		if (s0 =="sw") completeRegister(s1, i);
 		if (clock_initial!= DRAMclock){	// Means we stopped from completing some register
             cores[i]->clockCycles = DRAMclock;
@@ -227,19 +237,18 @@ void parser(vector<string> tokens, int i){
 		}
 
 		// Incase the lw gets handled by forwarding
-		if (s0=="lw" && address == cores[i]->last_updated_address){
+		if (s0=="lw" && address == get<0>(cores[i]->last_sw)){
 			if (didlw.first && didlw.second==i && cores[i]->clockCycles == DRAMclock){
 				cores[i]->clockCycles++;	// because we don't have 2 ports to update a register
 				DRAMclock++;
 				processCommand(getCommand());				
 			}
-
-			cores[i]->registers[s1] = cores[i]->last_stored_value;
+			cores[i]->registers[s1] = get<1>(cores[i]->last_sw);
 			cores[i]->forRefusing[s1] = cores[i]->counter;
 			cores[i]->registerUpdate.erase(s1);
 			stringstream buffercout;
 			buffercout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"; ";
-			buffercout << s1<<"= "<<cores[i]->last_stored_value<<"; Due to forwarding"<<"\n";
+			buffercout << s1<<"= "<<get<1>(cores[i]->last_sw)<<"; Due to forwarding"<<"\n";
 			print[{cores[i]->clockCycles, -1*cores[i]->clockCycles}][i] = buffercout.str();
 			cores[i]->clockCycles++;
 		}
@@ -272,8 +281,7 @@ void parser(vector<string> tokens, int i){
 			}
 			else if(s0=="sw"){
 				waitingList[row][col].push({cores[i]->counter, to_string(cores[i]->registers[s1]), i});
-				cores[i]->last_updated_address = address;
-				cores[i]->last_stored_value = cores[i]->registers[s1];
+				cores[i]->last_sw = {address, cores[i]->registers[s1], cores[i]->counter};
 			}
 		}
 	}
@@ -380,7 +388,6 @@ void parser(vector<string> tokens, int i){
 }
 
 int main(int argc, char** argv){
-
 	initialize(argc, argv);
 	if(throwError==1){
 		return 0;
