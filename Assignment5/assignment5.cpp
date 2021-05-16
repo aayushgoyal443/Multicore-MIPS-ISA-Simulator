@@ -1,14 +1,22 @@
-// TODO: Making the request manager is left
-// TODO: Capping the simulation time with M is left
+// TODO: Making the Priority encoder is left
+// TODO: Minorr bug is there in scrapping
+
 #include<bits/stdc++.h>
 #include "core.hpp"
 using namespace std;
 
-// For getting a reqquest to run in the DRAM, the returned command is non-redundant
-tuple <int, int, int, string, int> getCommand(){
-	if (waitingList.empty()) return {-1,-1,-1,"",-1};
+// Run the MRM fo once
+void runMRM(){
+	if (waitingList.empty()){
+		isReady =0;
+		command = {-1,-1,-1,"",-1};
+		return;
+	}
 	int row = currRow;
+
+	// TODO: we need to change the row such that we are going to run command for some other core, basically improving the MRM is left
 	if (waitingList.find(currRow)== waitingList.end()) row = (*waitingList.begin()).first;
+
 	int col = (*waitingList[row].begin()).first;
 	tuple<int, string, int> comm = waitingList[row][col].front();
 	int count = get<0>(comm);
@@ -17,17 +25,29 @@ tuple <int, int, int, string, int> getCommand(){
 	bool check_lw = (!check_number(reg));	// true if "lw" operation
 	bool check1 = check_lw && (cores[i]->registerUpdate.find(reg)== cores[i]->registerUpdate.end());	// means load on that register is not required, hence redundant operation
 	bool check2 = (check_lw && (!check1)) && (cores[i]->registerUpdate[reg].first != count);	// Update on register is required but not here, hence redundant operation
-	if (!check_lw){
-		if (count == get<2>(cores[i]->last_sw) ) cores[i]->last_sw = {-1,0,-1};
-	}
+
+	stringstream buffercout;
+	buffercout<< "(Core "<< i+1<<") " << cores[i]->insCounter[count-1]+1 <<" => " <<cores[i]->instructions[cores[i]->insCounter[count-1]];
 	if (check_lw && (check1 || check2)){
+		totalInstructions++;
 		waitingList[row][col].pop();
 		queueSize--;
-		if (waitingList[row][col].empty() ) waitingList[row].erase(col);
+		if (waitingList[row][col].empty()) waitingList[row].erase(col);
 		if (waitingList[row].empty()) waitingList.erase(row);
-		return getCommand();
+		buffercout <<" is scrapped\n";
+		print[{DRAMclock, -1*DRAMclock}][-1] = buffercout.str();
+		isReady =0;
+		command = {-1,-1,-1,"",-1};
 	}
-	else return {row, col, count, reg, i};
+	else{
+		isReady=1;
+		if (make_tuple(row, col, count, reg, i) != command){
+			buffercout <<" would be sent next\n";
+			print[{DRAMclock, -1*DRAMclock}][-1] = buffercout.str();
+		}
+		command = {row, col, count, reg, i};
+	}
+	
 }
 
 // This should never be passed any redundant instruction
@@ -45,18 +65,20 @@ void processCommand(tuple <int, int, int, string, int> command){
 	time_req+=DRAMclock;
 
 	if (currRow!= row){
-		if (currRow != -1){
+		if (currRow != -1 && dirty){
 			DRAM[currRow]  = buffer;
 			time_req+= row_access_delay;
 		}
 		currRow = row;
 		buffer = DRAM[currRow];
+		dirty = false;
 		row_buffer_updates++;
 		time_req+= row_access_delay;
 	}
 
 	if (check_number(reg)){
 		// Means this was a sw operation, and we are not ignoring any sw operation
+		dirty = true;
 		buffer[col] = stoi(reg);
 		row_buffer_updates++;
 		time_req+= col_access_delay;
@@ -70,17 +92,19 @@ void processCommand(tuple <int, int, int, string, int> command){
 		store  = {"lw", to_string(DRAMclock), reg, to_string(buffer[col]), count, i};
 	}
 	waitingList[row][col].pop();
-	queueSize--;
 	if (waitingList[row][col].empty() ) waitingList[row].erase(col);
 	if (waitingList[row].empty()) waitingList.erase(row);
 }
 
 // This marks the end of a process running in the DRAM 
 void processCompletion(){
+	totalInstructions++;
+	queueSize--;
 	stringstream buffercout;
     int count = get<4>(store);
 	int i  = get<5>(store);
 	string reg = get<2>(store);
+	if (count == get<2>(cores[i]->last_sw) ) cores[i]->last_sw = {-1,0,-1};
 	buffercout << to_string(cores[i]->insCounter[count-1]+1) +" => " +cores[i]->instructions[cores[i]->insCounter[count-1]]+"; ";
 	if (get<0>(store)=="lw"){
 		if (cores[i]->forRefusing[reg] > count) buffercout << "Rejected by processor, "<< reg<< " already updated in procesor\n";
@@ -94,53 +118,11 @@ void processCompletion(){
 	store = tuple <string ,string, string, string, int, int>();
 }
 
-// Whenever we encounter an unsafe instruction, we use this function to complete the value of register then and there.
-void completeRegister(string name, int i){
-	if (cores[i]->registerUpdate.find(name)== cores[i]->registerUpdate.end()){
-		if (get<2>(store) == name && get<5>(store) == i){
-			// Means we were currently processing that required register only
-			DRAMclock = time_req+1;
-			processCompletion();
-		}
-		return;
-	}
-	// else we have unfinished business
-
-	if (time_req != -1){	// Need to complete the ongoing work forcefully
-		DRAMclock = time_req+1;
-		processCompletion();
-	}
-	else if (just_did) ++DRAMclock;
-
-	// Complete that [row][col]
-	int count_req = cores[i]->registerUpdate[name].first;
-	int address  = cores[i]->registerUpdate[name].second;
-	int row = address/1024;
-	int col = (address%1024)/4;
-
-	tuple<int, string, int> p;
-	string reg="";
-	int count=-1;
-	while(true){
-		p = waitingList[row][col].front();
-		count = get<0>(p);
-		reg = get<1>(p);
-		bool check_lw = (!check_number(reg));	// true if "lw" operation
-		bool check1 = check_lw &&  (cores[i]->registerUpdate.find(reg)== cores[i]->registerUpdate.end());	// means load on that register is not required, hence redundant operation
-		bool check2 = (check_lw && (!check1)) && (cores[i]->registerUpdate[reg].first != count);	// Update on register is required but not here, hence redundant operation
-		if (check_lw && (check1 || check2)){
-			waitingList[row][col].pop();
-			queueSize--;
-			if (waitingList[row][col].empty() ) waitingList[row].erase(col);
-			if (waitingList[row].empty()) waitingList.erase(row);
-			continue;
-		}
-		processCommand({row,col,count, reg,i});
-		DRAMclock = time_req+1;
-		processCompletion();
-
-		if (get<0>(p) == count_req) break;
-	}
+// To check whether the register is complete or not, returns true is it is not an unsafe instruction
+bool checkComplete(string name, int i){
+	if (cores[i]->registerUpdate.find(name)!= cores[i]->registerUpdate.end()) return false;
+	if (get<2>(store) == name && get<5>(store) == i) return false;
+	return true;
 }
 
 // Parser executes the required functions (tokens and core_num as arguments)
@@ -181,8 +163,8 @@ void parser(vector<string> tokens, int i){
 		stringstream buffercout;
 		buffercout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"; ";
 		buffercout <<"Jumping to "<<s1<<"\n";
-		print[{cores[i]->clockCycles, -1*cores[i]->clockCycles}][i] = buffercout.str();
-		cores[i]->clockCycles++;
+		print[{DRAMclock, -1*DRAMclock}][i] = buffercout.str();
+		totalInstructions++;
 	}
 	else if(m==3){
 		if (s0 != "lw" && s0!="sw"){
@@ -207,8 +189,11 @@ void parser(vector<string> tokens, int i){
 			cores[i]->error=1;
 			return;
 		}
-		int clock_initial = DRAMclock;
-		completeRegister(extract_reg(s2), i);
+
+		if (!checkComplete(extract_reg(s2), i) || (s0== "sw" && !checkComplete(s1, i))) return;
+		if (s0== "sw" && checkComplete(s1,i) && just_did == make_tuple("lw", i, s1)) return;
+		if (checkComplete(extract_reg(s2),i) && just_did == make_tuple("lw", i, extract_reg(s2))) return;
+
 		int address=locateAddress(s2, i);
 		if (address==-2){
 			cout<<"Core "<<i+1<<": Only 2^20 Bytes of memory could be used on line "<<(++cores[i]->itr)<<endl;
@@ -222,12 +207,6 @@ void parser(vector<string> tokens, int i){
 		}
 		int row = address/1024;
 		int col = (address%1024)/4;
-		if ( address_core.find(address)!= address_core.end() && address_core[address] != i+1){
-			cout<<"Core "<<i+1<<": Memory address "<<address<<" already accessed in core "<<address_core[address]<<", error on line"<<(++cores[i]->itr)<<endl;
-			cores[i]->error=1;
-			return;
-		}
-		address_core[address] =i+1;
 
 		if ( address_core.find(address)!= address_core.end() && address_core[address] != i+1){
 			cout<<"Core "<<i+1<<": Memory address "<<address<<" already accessed in core "<<address_core[address]<<", error on line"<<(++cores[i]->itr)<<endl;
@@ -235,53 +214,28 @@ void parser(vector<string> tokens, int i){
 			return;
 		}
 		address_core[address] =i+1;
-
-		if (s0 =="sw") completeRegister(s1, i);
-		if (clock_initial!= DRAMclock){	// Means we stopped from completing some register
-            cores[i]->clockCycles = DRAMclock;
-			didlw.first = false;
-			processCommand(getCommand());
-		}
 
 		// Incase the lw gets handled by forwarding
 		if (s0=="lw" && address == get<0>(cores[i]->last_sw)){
-			if (didlw.first && didlw.second==i && cores[i]->clockCycles == DRAMclock){
-				cores[i]->clockCycles++;	// because we don't have 2 ports to update a register
-				DRAMclock++;
-				processCommand(getCommand());				
-			}
+			if (get<0>(just_did) == "lw" && get<1>(just_did) ==i) return;
 			cores[i]->registers[s1] = get<1>(cores[i]->last_sw);
 			cores[i]->forRefusing[s1] = cores[i]->counter;
 			cores[i]->registerUpdate.erase(s1);
 			stringstream buffercout;
 			buffercout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"; ";
 			buffercout << s1<<"= "<<get<1>(cores[i]->last_sw)<<"; Due to forwarding"<<"\n";
-			print[{cores[i]->clockCycles, -1*cores[i]->clockCycles}][i] = buffercout.str();
-			cores[i]->clockCycles++;
+			print[{DRAMclock, -1*DRAMclock}][i] = buffercout.str();
+			totalInstructions++;
 		}
 		// Normal lw and sw instruction 
 		else{
-			if (queueSize == MAX_SIZE){
-				// We have to process one more command from waiting list, we don't have to finsih it, just need to start it's execution 
-				if (time_req != -1){	// Need to complete the ongoing work forcefully
-                    DRAMclock = time_req+1;
-					processCompletion();
-					cores[i]->clockCycles = DRAMclock;
-					didlw.first = false;
-				}
-				else if (just_did) DRAMclock++;
-				processCommand(getCommand());
-			}
-			if (queueSize>=MAX_SIZE){
-				cout <<"No space in waiting list\n";
-				throwError=1;
-				return ;
-			}
+			if (queueSize == MAX_SIZE) return;
+			if (queueSize == MAX_SIZE-1 && get<0>(just_did) !="") return;
 			stringstream buffercout;
 			buffercout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"; ";
 			buffercout << "DRAM request issued"<<"\n";
-			print[{cores[i]->clockCycles, -1*cores[i]->clockCycles}][i] = buffercout.str();
-			cores[i]->clockCycles++;
+			print[{DRAMclock, -1*DRAMclock}][i] = buffercout.str();
+			
 			queueSize++;
 			if(s0=="lw"){
 				waitingList[row][col].push({cores[i]->counter, s1, i});
@@ -308,13 +262,9 @@ void parser(vector<string> tokens, int i){
 				cores[i]->error=1;
 				return;
 			}
-			int clock_initial = DRAMclock;
-			completeRegister(s1, i);
-			completeRegister(s2, i);
-			if (clock_initial!= DRAMclock){
-				cores[i]->clockCycles = DRAMclock;
-				processCommand(getCommand());
-			}
+			if (!checkComplete(s1,i) || !checkComplete(s2,i)) return;
+			if (checkComplete(s1,i) && just_did == make_tuple("lw", i, s1)) return;
+			if (checkComplete(s2,i) && just_did == make_tuple("lw", i, s2)) return;
 			int toJump = 0;
 			if (s0 == "beq" && cores[i]->registers[s1]==cores[i]->registers[s2]){
 				toJump = 1;
@@ -331,8 +281,8 @@ void parser(vector<string> tokens, int i){
 			else{
 				buffercout <<"No jump required to "<< s3 <<"\n";
 			}
-			print[{cores[i]->clockCycles, -1*cores[i]->clockCycles}][i] = buffercout.str();
-			cores[i]->clockCycles++;
+			print[{DRAMclock, -1*DRAMclock}][i] = buffercout.str();
+			totalInstructions++;
 		}
 		else if (s0=="add" || s0=="sub" || s0=="mul" || s0 == "slt" || s0=="addi"){
 
@@ -351,21 +301,12 @@ void parser(vector<string> tokens, int i){
 				cores[i]->error=1;
 				return;
 			}
-			
-			int clock_initial = DRAMclock;
-			completeRegister(s2, i);
-			if (s0 != "addi") completeRegister(s3, i);
-			if (clock_initial!= DRAMclock){
-				didlw.first = false;
-				cores[i]->clockCycles = DRAMclock;
-				processCommand(getCommand());
-			}
 
-			if (didlw.first && didlw.second ==i && cores[i]->clockCycles ==DRAMclock){
-				cores[i]->clockCycles++;	// because we don't have 2 ports to update a register
-				DRAMclock++;
-				processCommand(getCommand());
-			}
+			if (!checkComplete(s2,i) || (s0 != "addi" && !checkComplete(s3,i))) return;
+			if (checkComplete(s2,i) && just_did == make_tuple("lw", i, s2)) return;
+			if (s0 != "addi" && checkComplete(s3,i) && just_did == make_tuple("lw", i, s3)) return;
+
+			if (get<0>(just_did) == "lw" && get<1>(just_did) ==i) return;
 
 			if (s0 == "add") cores[i]->registers[s1]=cores[i]->registers[s2]+cores[i]->registers[s3];
 			else if (s0=="sub") cores[i]->registers[s1]=cores[i]->registers[s2]-cores[i]->registers[s3];
@@ -378,8 +319,8 @@ void parser(vector<string> tokens, int i){
 			stringstream buffercout;
 			buffercout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"; ";
 			buffercout <<s1<<"= "<<cores[i]->registers[s1]<<"\n";
-			print[{cores[i]->clockCycles, -1*cores[i]->clockCycles}][i] = buffercout.str();
-			cores[i]->clockCycles++;
+			print[{DRAMclock, -1*DRAMclock}][i] = buffercout.str();
+			totalInstructions++;
 		}
 		
 		else{
@@ -401,59 +342,29 @@ int main(int argc, char** argv){
 		return 0;
 	}
 
-	// Start running the file
-	while(true){
-		didlw = {false, 1};
-		just_did = false;
+	// Start running the file untill we reach the max time
+	while(DRAMclock <= MAX_TIME){
+
+		if (time_req==-1 && isReady) processCommand(command);
+		
+		just_did = {"", -1, ""};
         if (time_req == DRAMclock){
-			if (get<0>(store) == "lw"){
-				didlw.first = true;
-				didlw.second = get<5>(store);
-			}
-			just_did = true;
+			get<0>(just_did) = get<0>(store);
+			get<1>(just_did) = get<5>(store);
+			get<2>(just_did) = get<2>(store);
             processCompletion();
         }
 
-		bool all_error = true;
-		bool all_done = true;
-		for (int i=0;i<N;i++){
-			if (cores[i]->error ==0) all_error= false;
-		}
-		for (int i=0;i<N;i++){
-			if (cores[i]->error ==0 && cores[i]->itr < cores[i]->instructions.size()) all_done = false;
-		}
-		if (all_error || throwError==1){
-			if (all_error) cout <<"\nError in all the files\n";
-			return 0;
-		}
-		if (all_done){
-			break;
-		}
+		runMRM();
 
 		for (int i=0;i<N;i++){
 			if (cores[i]->error==0 && cores[i]->itr < cores[i]->instructions.size()) parser(lexer(cores[i]->instructions[cores[i]->itr]), i);
 		}
 		
 		DRAMclock++;
-		if (time_req==-1){
-			processCommand(getCommand());
-		}
-	}
-	DRAMclock++;
-
-	// Complete any remaining requests in the DRAM
-	if (time_req != -1){
-		DRAMclock = time_req+1;
-		processCompletion();
-	}
-	while (!waitingList.empty()){
-		processCommand(getCommand());
-		if(time_req==(-1)) break;
-		DRAMclock = time_req+1;
-		processCompletion();
 	}
 
-	if (currRow!=-1) DRAM[currRow] = buffer;
+	if (currRow!=-1 && dirty) DRAM[currRow] = buffer;
 
 	print_stats();
 
