@@ -1,8 +1,8 @@
-// TODO: Making the Priority encoder is left
-
 #include<bits/stdc++.h>
 #include "core.hpp"
 using namespace std;
+
+string priority[MAX_CORE] ={""};
 
 // Run the MRM fo once
 void runMRM(){
@@ -11,15 +11,48 @@ void runMRM(){
 		command = {-1,-1,-1,"",-1};
 		return;
 	}
+
+	int i = currCore;
 	int row = currRow;
+	bool check3 = (currCount>=5);
+	bool check4 = (waitingList.find(currCore)== waitingList.end());
+	bool check5 = (!check4 && waitingList[currCore].find(currRow)== waitingList[currCore].end());
+	if (check3 || check4 || check5){
+		bool done=false;
+		// Changing the Row according to core need
+		for(int j=1;j<=MAX_CORE;j++){
+			if (priority[(currCore+j)%MAX_CORE]!=""){
+				i = (currCore+j)%MAX_CORE;
+				if (priority[i]=="do"){
+					// We just need to make some space in the waiting queue
+					row = (*waitingList[i].begin()).first;
+				}
+				else{
+					// Need priority for some register
+					int address  = cores[i]->registerUpdate[priority[i]].second;
+					int row = address/1024;
+				}
+				done = true;
+				break;
+			}
+		}
+		// Changing the Row if all cores are happy
+		if (!done){
+			for (int j=1; j<=MAX_CORE;j++){
+				if (waitingList.find((i+j)%MAX_CORE) != waitingList.end()){
+					i= (i+j)%MAX_CORE;
+					break;
+				}
+			}
+			row = (*waitingList[i].begin()).first;
+		}
+	}
 
-	if (waitingList.find(currRow)== waitingList.end()) row = (*waitingList.begin()).first;
+	tuple<int, string, int> comm = waitingList[i][row].front();
 
-	int col = (*waitingList[row].begin()).first;
-	tuple<int, string, int> comm = waitingList[row][col].front();
 	int count = get<0>(comm);
 	string reg = get<1>(comm);
-	int i = get<2>(comm);
+	int col = get<2>(comm);
 	bool check_lw = (!check_number(reg));	// true if "lw" operation
 	bool check1 = check_lw && (cores[i]->registerUpdate.find(reg)== cores[i]->registerUpdate.end());	// means load on that register is not required, hence redundant operation
 	bool check2 = (check_lw && (!check1)) && (cores[i]->registerUpdate[reg].first != count);	// Update on register is required but not here, hence redundant operation
@@ -28,10 +61,10 @@ void runMRM(){
 	buffercout<< "(Core "<< i+1<<") " << cores[i]->insCounter[count-1]+1 <<" => " <<cores[i]->instructions[cores[i]->insCounter[count-1]];
 	if (check_lw && (check1 || check2)){
 		totalInstructions++;
-		waitingList[row][col].pop();
-		queueSize--;
-		if (waitingList[row][col].empty()) waitingList[row].erase(col);
-		if (waitingList[row].empty()) waitingList.erase(row);
+		waitingList[i][row].pop();
+		queueSize[i]--;
+		if (waitingList[i][row].empty() ) waitingList[i].erase(row);
+		if (waitingList[i].empty()) waitingList.erase(i);
 		buffercout <<" is scrapped\n";
 		print[{DRAMclock, -1*DRAMclock}][-1] = buffercout.str();
 		isReady =0;
@@ -68,12 +101,17 @@ void processCommand(tuple <int, int, int, string, int> command){
 			time_req+= row_access_delay;
 		}
 		currRow = row;
+		currCore = i;
+		currCount=1;
 		buffer = DRAM[currRow];
 		dirty = false;
 		row_buffer_updates++;
 		time_req+= row_access_delay;
 	}
-
+	else{
+		currCount++;
+	}
+	if (priority[i]=="do") priority[i] ="";
 	if (check_number(reg)){
 		// Means this was a sw operation, and we are not ignoring any sw operation
 		dirty = true;
@@ -85,22 +123,25 @@ void processCommand(tuple <int, int, int, string, int> command){
 	else{
 		// means this is a lw operation
 		cores[i]->registers[reg] = buffer[col];
-		if (cores[i]->registerUpdate[reg].first == count) cores[i]->registerUpdate.erase(reg);
+		if (cores[i]->registerUpdate[reg].first == count){
+			cores[i]->registerUpdate.erase(reg);
+			if (priority[i]==reg) priority[i]= "";
+		}
 		time_req+= col_access_delay;
 		store  = {"lw", to_string(DRAMclock), reg, to_string(buffer[col]), count, i};
 	}
-	waitingList[row][col].pop();
-	if (waitingList[row][col].empty() ) waitingList[row].erase(col);
-	if (waitingList[row].empty()) waitingList.erase(row);
+	waitingList[i][row].pop();
+	if (waitingList[i][row].empty() ) waitingList[i].erase(row);
+	if (waitingList[i].empty()) waitingList.erase(i);
 }
 
 // This marks the end of a process running in the DRAM 
 void processCompletion(){
 	totalInstructions++;
-	queueSize--;
 	stringstream buffercout;
     int count = get<4>(store);
 	int i  = get<5>(store);
+	queueSize[i]--;
 	string reg = get<2>(store);
 	if (count == get<2>(cores[i]->last_sw) ) cores[i]->last_sw = {-1,0,-1};
 	buffercout << to_string(cores[i]->insCounter[count-1]+1) +" => " +cores[i]->instructions[cores[i]->insCounter[count-1]]+"; ";
@@ -118,7 +159,10 @@ void processCompletion(){
 
 // To check whether the register is complete or not, returns true is it is not an unsafe instruction
 bool checkComplete(string name, int i){
-	if (cores[i]->registerUpdate.find(name)!= cores[i]->registerUpdate.end()) return false;
+	if (cores[i]->registerUpdate.find(name)!= cores[i]->registerUpdate.end()){
+		priority[i] = name;
+		return false;
+	}
 	if (get<2>(store) == name && get<5>(store) == i) return false;
 	return true;
 }
@@ -206,12 +250,12 @@ void parser(vector<string> tokens, int i){
 		int row = address/1024;
 		int col = (address%1024)/4;
 
-		if ( address_core.find(address)!= address_core.end() && address_core[address] != i+1){
-			cout<<"Core "<<i+1<<": Memory address "<<address<<" already accessed in core "<<address_core[address]<<", error on line"<<(++cores[i]->itr)<<endl;
+		if ( address_core.find(row)!= address_core.end() && address_core[row] != i+1){
+			cout<<"Core "<<i+1<<": Memory address "<<address<<" already accessed in core "<<address_core[row]<<", error on line"<<(++cores[i]->itr)<<endl;
 			cores[i]->error=1;
 			return;
 		}
-		address_core[address] =i+1;
+		address_core[row] =i+1;
 
 		// Incase the lw gets handled by forwarding
 		if (s0=="lw" && address == get<0>(cores[i]->last_sw)){
@@ -227,20 +271,23 @@ void parser(vector<string> tokens, int i){
 		}
 		// Normal lw and sw instruction 
 		else{
-			if (queueSize == MAX_SIZE) return;
-			if (queueSize == MAX_SIZE-1 && get<0>(just_did) !="") return;
+			if (queueSize[i] == MAX_SIZE){
+				priority[i]= "do";
+				return;
+			}
+			if (queueSize[i] == MAX_SIZE-1 && get<0>(just_did) !="" && get<1>(just_did)==i) return;
 			stringstream buffercout;
 			buffercout << cores[i]->itr+1<<" => "<<cores[i]->instructions[cores[i]->itr]<<"; ";
 			buffercout << "DRAM request issued"<<"\n";
 			print[{DRAMclock, -1*DRAMclock}][i] = buffercout.str();
 			
-			queueSize++;
+			queueSize[i]++;
 			if(s0=="lw"){
-				waitingList[row][col].push({cores[i]->counter, s1, i});
+				waitingList[i][row].push({cores[i]->counter, s1, col});
 				cores[i]->registerUpdate[s1] = {cores[i]->counter, address};
 			}
 			else if(s0=="sw"){
-				waitingList[row][col].push({cores[i]->counter, to_string(cores[i]->registers[s1]), i});
+				waitingList[i][row].push({cores[i]->counter, to_string(cores[i]->registers[s1]), col});
 				cores[i]->last_sw = {address, cores[i]->registers[s1], cores[i]->counter};
 			}
 		}

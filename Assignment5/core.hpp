@@ -1,6 +1,8 @@
 #include<bits/stdc++.h>
 using namespace std;
 
+#define MAX_CORE 16
+
 int throwError = 0;
 map <pair<int, int>, map<int,string>> print;
 // [ending cycle][-1 * starting cycle][core] = the string to be printed;
@@ -36,16 +38,15 @@ class Core{
 int N = 1;	// N cores
 long long MAX_TIME = 2000000000;	// M time to run
 vector<Core*> cores;
-int currentCore = 0;
 
 /*********************** Request Manager *************************/
 
 map<int, map<int, queue<tuple<int, string, int>>>> waitingList;
-//[row][col]= {counter, reg_name/value, core}
+//[core][row]= {counter, reg_name/value, col}
 //value denotes that it was a sw instruction and reg_name(register name) denotes it was an lw instruction
 
-int queueSize = 0;
-const int MAX_SIZE = 64;
+int queueSize[MAX_CORE] = {0};
+const int MAX_SIZE = 32;
 int isReady=0;
 tuple <int, int, int, string, int> command = {-1,-1,-1,"",-1};
 
@@ -61,11 +62,13 @@ tuple<string, string, string, string, int, int> store;
 int DRAMclock=1;
 tuple<string, int, string> just_did ={"", -1, ""};  // {lw/sw/"" is nothing done, core, register}
 int currRow = -1; //row number of current row buffer
+int currCore = -1;  // The core whose DRAM instruction is being executed
+int currCount = 0; // To check when will the core be executed 5 times
 int row_buffer_updates = 0;
 int time_req = -1; // This marks the clock cycle at which the DRAM request will complete
 int row_access_delay = 10;        
 int col_access_delay = 2;
-map<int, int> address_core; // [address] = core in which it was accessed, 0 if never accessed
+map<int, int> address_core; // [row] = core in which it was accessed, 0 if never accessed
 
 /*********************** Helper functions ***********************/
 void initialize(int argc, char** argv);
@@ -281,6 +284,7 @@ void print_stats()
 		cout << row_access_delay << " extra cycles taken for final writeback.\n\n";
 
     cout <<"Total instructions executed: "<< totalInstructions<<"\n";
+    cout <<"Throughput: "<<totalInstructions/MAX_TIME<<"\n";
 }
 
 void initialize_short(int N, string folder){
