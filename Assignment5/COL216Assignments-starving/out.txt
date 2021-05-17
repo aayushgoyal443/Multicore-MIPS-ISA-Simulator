@@ -1,0 +1,647 @@
+Every cycle description:
+
+Cycle 1:
+Core 1: 2 => 	addi $s0, $zero, 1000; $s0= 1000
+Core 2: 1 => addi $s0, $zero, 4000; $s0= 4000
+Core 3: 2 => 	addi $s0, $zero, 5; $s0= 5
+
+Cycle 2:
+Core 1: 3 => 	addi $s1, $zero, 0; $s1= 0
+Core 2: 2 => addi $s1, $zero, 2500; $s1= 2500
+Core 3: 3 => 	addi $s1, $zero, 0; $s1= 0
+
+Cycle 3:
+Core 1: 4 => 	addi $s2, $zero, 10; $s2= 10
+Core 2: 3 => addi $t0, $zero, 1; $t0= 1
+Core 3: 4 => 	addi $s2, $zero, 1; $s2= 1
+
+Cycle 4:
+Core 1: 5 => 	addi $t1, $zero, 0; $t1= 0
+Core 2: 4 => addi $t1, $zero, 2; $t1= 2
+Core 3: 5 => 	addi $s3, $zero, 1; $s3= 1
+
+Cycle 5:
+Core 1: 7 => 	addi $t1, $t1, 1; $t1= 1
+Core 2: 5 => addi $t2, $zero, 3; $t2= 3
+Core 3: 6 => 	addi $s4, $zero, 1; $s4= 1
+
+Cycle 6:
+Core 1: 8 => 	sw $t1, 0($s0); DRAM request issued
+Core 2: 6 => addi $t3, $zero, 4; $t3= 4
+Core 3: 8 => 	slt $t0, $s0, $s2; $t0= 0
+
+Cycle 7:
+Core 1: 9 => 	addi $s0, $s0, 4; $s0= 1004
+Core 2: 7 => sw $t0, 0($s0); DRAM request issued
+Core 3: 9 => 	beq $t0, $zero, run; Jumping to run
+
+Cycle 8:
+Core 1: 10 => 	addi $s1, $s1, 1; $s1= 1
+Core 2: 8 => sw $t1, 0($s1); DRAM request issued
+Core 3: 12 => 	add $s1, $s1, $s0; $s1= 5
+
+Cycle 9:
+Core 1: 11 => 	slt $s3, $s1, $s2; $s3= 1
+Core 2: 9 => sw $t2, 4($s0); DRAM request issued
+Core 3: 13 => 	mul $s3, $s3, $s0; $s3= 5
+
+Cycle 10:
+Core 1: 12 => 	bne $s3, $zero, initloop; Jumping to initloop
+Core 2: 10 => sw $t4, 4($s1); DRAM request issued
+Core 3: 14 => 	sub $s0, $s0, $s4; $s0= 4
+
+Cycle 11:
+Core 1: 7 => 	addi $t1, $t1, 1; $t1= 2
+Core 2: 11 => lw $t5, 0($s0); DRAM request issued
+Core 3: 7 => check:; Jumping to check
+
+Cycle 12:
+Core 1: 8 => 	sw $t1, 0($s0); DRAM request issued
+Core 2: 12 => lw $t6, 0($s1); DRAM request issued
+Core 3: 8 => 	slt $t0, $s0, $s2; $t0= 0
+
+Cycle 13:
+Core 1: 9 => 	addi $s0, $s0, 4; $s0= 1008
+Core 2: 13 => lw $t7, 4($s0); DRAM request issued
+Core 3: 9 => 	beq $t0, $zero, run; Jumping to run
+
+Cycle 14:
+Core 1: 10 => 	addi $s1, $s1, 1; $s1= 2
+Core 2: 14 => lw $t8, 4($s1); $t8= 0; Due to forwarding
+Core 3: 12 => 	add $s1, $s1, $s0; $s1= 9
+
+Cycle 15:
+Core 1: 11 => 	slt $s3, $s1, $s2; $s3= 1
+Core 3: 13 => 	mul $s3, $s3, $s0; $s3= 20
+
+Cycle 16:
+Core 1: 12 => 	bne $s3, $zero, initloop; Jumping to initloop
+Core 3: 14 => 	sub $s0, $s0, $s4; $s0= 3
+
+Cycle 17:
+Core 1: 7 => 	addi $t1, $t1, 1; $t1= 3
+Core 3: 7 => check:; Jumping to check
+
+Cycle 18:
+Core 1: 8 => 	sw $t1, 0($s0); DRAM request issued
+Core 3: 8 => 	slt $t0, $s0, $s2; $t0= 0
+
+Cycle 7-18:
+Core 1: 8 => 	sw $t1, 0($s0); Memory address 1000-1003= 1
+
+Cycle 19:
+Core 1: 9 => 	addi $s0, $s0, 4; $s0= 1012
+Core 3: 9 => 	beq $t0, $zero, run; Jumping to run
+
+Cycle 20:
+Core 1: 10 => 	addi $s1, $s1, 1; $s1= 3
+Core 3: 12 => 	add $s1, $s1, $s0; $s1= 12
+
+Cycle 19-20:
+Core 1: 8 => 	sw $t1, 0($s0); Memory address 1004-1007= 2
+
+Cycle 21:
+Core 1: 11 => 	slt $s3, $s1, $s2; $s3= 1
+Core 3: 13 => 	mul $s3, $s3, $s0; $s3= 60
+
+Cycle 22:
+Core 1: 12 => 	bne $s3, $zero, initloop; Jumping to initloop
+Core 3: 14 => 	sub $s0, $s0, $s4; $s0= 2
+
+Cycle 21-22:
+Core 1: 8 => 	sw $t1, 0($s0); Memory address 1008-1011= 3
+
+Cycle 23:
+Core 1: 7 => 	addi $t1, $t1, 1; $t1= 4
+Core 3: 7 => check:; Jumping to check
+
+Cycle 24:
+Core 1: 8 => 	sw $t1, 0($s0); DRAM request issued
+Core 3: 8 => 	slt $t0, $s0, $s2; $t0= 0
+
+Cycle 25:
+Core 1: 9 => 	addi $s0, $s0, 4; $s0= 1016
+Core 3: 9 => 	beq $t0, $zero, run; Jumping to run
+
+Cycle 26:
+Core 1: 10 => 	addi $s1, $s1, 1; $s1= 4
+Core 3: 12 => 	add $s1, $s1, $s0; $s1= 14
+
+Cycle 27:
+Core 1: 11 => 	slt $s3, $s1, $s2; $s3= 1
+Core 3: 13 => 	mul $s3, $s3, $s0; $s3= 120
+
+Cycle 28:
+Core 1: 12 => 	bne $s3, $zero, initloop; Jumping to initloop
+Core 3: 14 => 	sub $s0, $s0, $s4; $s0= 1
+
+Cycle 29:
+Core 1: 7 => 	addi $t1, $t1, 1; $t1= 5
+Core 3: 7 => check:; Jumping to check
+
+Cycle 30:
+Core 1: 8 => 	sw $t1, 0($s0); DRAM request issued
+Core 3: 8 => 	slt $t0, $s0, $s2; $t0= 0
+
+Cycle 31:
+Core 1: 9 => 	addi $s0, $s0, 4; $s0= 1020
+Core 3: 9 => 	beq $t0, $zero, run; Jumping to run
+
+Cycle 32:
+Core 1: 10 => 	addi $s1, $s1, 1; $s1= 5
+Core 3: 12 => 	add $s1, $s1, $s0; $s1= 15
+
+Cycle 33:
+Core 1: 11 => 	slt $s3, $s1, $s2; $s3= 1
+Core 3: 13 => 	mul $s3, $s3, $s0; $s3= 120
+
+Cycle 34:
+Core 1: 12 => 	bne $s3, $zero, initloop; Jumping to initloop
+Core 3: 14 => 	sub $s0, $s0, $s4; $s0= 0
+
+Cycle 35:
+Core 1: 7 => 	addi $t1, $t1, 1; $t1= 6
+Core 3: 7 => check:; Jumping to check
+
+Cycle 36:
+Core 1: 8 => 	sw $t1, 0($s0); DRAM request issued
+Core 3: 8 => 	slt $t0, $s0, $s2; $t0= 1
+
+Cycle 37:
+Core 1: 9 => 	addi $s0, $s0, 4; $s0= 1024
+Core 3: 9 => 	beq $t0, $zero, run; No jump required to run
+
+Cycle 38:
+Core 1: 10 => 	addi $s1, $s1, 1; $s1= 6
+Core 3: 10 => 	bne $t0, $zero, loopexit; Jumping to loopexit
+
+Cycle 39:
+Core 1: 11 => 	slt $s3, $s1, $s2; $s3= 1
+Core 3: 17 => 	add $s1, $s1, $zero; $s1= 15
+
+Cycle 40:
+Core 1: 12 => 	bne $s3, $zero, initloop; Jumping to initloop
+Core 3: 18 => 	mul $s3, $s3, $s4; $s3= 120
+
+Cycle 41:
+Core 1: 7 => 	addi $t1, $t1, 1; $t1= 7
+
+Cycle 42:
+Core 1: 8 => 	sw $t1, 0($s0); DRAM request issued
+
+Cycle 43:
+Core 1: 9 => 	addi $s0, $s0, 4; $s0= 1028
+
+Cycle 44:
+Core 1: 10 => 	addi $s1, $s1, 1; $s1= 7
+
+Cycle 23-44:
+Core 2: 8 => sw $t1, 0($s1); Memory address 2500-2503= 2
+
+Cycle 45:
+Core 1: 11 => 	slt $s3, $s1, $s2; $s3= 1
+
+Cycle 46:
+Core 1: 12 => 	bne $s3, $zero, initloop; Jumping to initloop
+
+Cycle 45-46:
+Core 2: 12 => lw $t6, 0($s1); $t6= 2
+
+Cycle 47:
+Core 1: 7 => 	addi $t1, $t1, 1; $t1= 8
+
+Cycle 48:
+Core 1: 8 => 	sw $t1, 0($s0); DRAM request issued
+
+Cycle 47-48:
+Core 2: 10 => sw $t4, 4($s1); Memory address 2504-2507= 0
+
+Cycle 49:
+Core 1: 9 => 	addi $s0, $s0, 4; $s0= 1032
+
+Cycle 50:
+Core 1: 10 => 	addi $s1, $s1, 1; $s1= 8
+
+Cycle 51:
+Core 1: 11 => 	slt $s3, $s1, $s2; $s3= 1
+
+Cycle 52:
+Core 1: 12 => 	bne $s3, $zero, initloop; Jumping to initloop
+
+Cycle 53:
+Core 1: 7 => 	addi $t1, $t1, 1; $t1= 9
+
+Cycle 54:
+Core 1: 8 => 	sw $t1, 0($s0); DRAM request issued
+
+Cycle 55:
+Core 1: 9 => 	addi $s0, $s0, 4; $s0= 1036
+
+Cycle 56:
+Core 1: 10 => 	addi $s1, $s1, 1; $s1= 9
+
+Cycle 57:
+Core 1: 11 => 	slt $s3, $s1, $s2; $s3= 1
+
+Cycle 58:
+Core 1: 12 => 	bne $s3, $zero, initloop; Jumping to initloop
+
+Cycle 59:
+Core 1: 7 => 	addi $t1, $t1, 1; $t1= 10
+
+Cycle 60:
+Core 1: 8 => 	sw $t1, 0($s0); DRAM request issued
+
+Cycle 61:
+Core 1: 9 => 	addi $s0, $s0, 4; $s0= 1040
+
+Cycle 62:
+Core 1: 10 => 	addi $s1, $s1, 1; $s1= 10
+
+Cycle 63:
+Core 1: 11 => 	slt $s3, $s1, $s2; $s3= 0
+
+Cycle 64:
+Core 1: 12 => 	bne $s3, $zero, initloop; No jump required to initloop
+
+Cycle 65:
+Core 1: 13 => 	addi $s0, $zero, 1000; $s0= 1000
+
+Cycle 66:
+Core 1: 14 => 	addi $s1, $zero, 0; $s1= 0
+
+Cycle 67:
+Core 1: 15 => 	addi $s3, $zero, 0; $s3= 0
+
+Cycle 68:
+Core 1: 16 => 	addi $s2, $zero, 9; $s2= 9
+
+Cycle 69:
+Core 1: 18 => 	lw $t0, 0($s0); DRAM request issued
+
+Cycle 70:
+Core 1: 19 => 	addi $s0, $s0, 4; $s0= 1004
+
+Cycle 49-70:
+Core 1: 8 => 	sw $t1, 0($s0); Memory address 1012-1015= 4
+
+Cycle 71:
+Core 1: 20 => 	lw $t1, 0($s0); DRAM request issued
+
+Cycle 71-72:
+Core 1: 18 => 	lw $t0, 0($s0); $t0= 1
+
+Cycle 73-74:
+Core 1: 20 => 	lw $t1, 0($s0); $t1= 2
+
+Cycle 75:
+Core 1: 21 => 	add $t2, $t0, $t1; $t2= 3
+
+Cycle 76:
+Core 1: 22 => 	sw $t2, 0($s0); DRAM request issued
+
+Cycle 75-76:
+Core 1: 8 => 	sw $t1, 0($s0); Memory address 1016-1019= 5
+
+Cycle 77:
+Core 1: 23 => 	addi $s1, $s1, 1; $s1= 1
+
+Cycle 78:
+Core 1: 24 => 	slt $s3, $s1, $s2; $s3= 1
+
+Cycle 77-78:
+Core 1: 22 => 	sw $t2, 0($s0); Memory address 1004-1007= 3
+
+Cycle 79:
+Core 1: 25 => 	bne $s3, $zero, sumloop; Jumping to sumloop
+
+Cycle 80:
+Core 1: 18 => 	lw $t0, 0($s0); DRAM request issued
+
+Cycle 79-80:
+Core 1: 8 => 	sw $t1, 0($s0); Memory address 1020-1023= 6
+
+Cycle 81:
+Core 1: 19 => 	addi $s0, $s0, 4; $s0= 1008
+
+Cycle 82:
+Core 1: 20 => 	lw $t1, 0($s0); DRAM request issued
+
+Cycle 81-82:
+Core 1: 18 => 	lw $t0, 0($s0); $t0= 3
+
+Cycle 83-84:
+Core 1: 20 => 	lw $t1, 0($s0); $t1= 3
+
+Cycle 85:
+Core 1: 21 => 	add $t2, $t0, $t1; $t2= 6
+
+Cycle 86:
+Core 1: 22 => 	sw $t2, 0($s0); DRAM request issued
+
+Cycle 87:
+Core 1: 23 => 	addi $s1, $s1, 1; $s1= 2
+
+Cycle 88:
+Core 1: 24 => 	slt $s3, $s1, $s2; $s3= 1
+
+Cycle 89:
+Core 1: 25 => 	bne $s3, $zero, sumloop; Jumping to sumloop
+
+Cycle 90:
+Core 1: 18 => 	lw $t0, 0($s0); $t0= 6; Due to forwarding
+
+Cycle 91:
+Core 1: 19 => 	addi $s0, $s0, 4; $s0= 1012
+
+Cycle 92:
+Core 1: 20 => 	lw $t1, 0($s0); DRAM request issued
+
+Cycle 85-106:
+Core 1: 8 => 	sw $t1, 0($s0); Memory address 1024-1027= 7
+
+Cycle 107-128:
+Core 1: 20 => 	lw $t1, 0($s0); $t1= 4
+
+Cycle 129:
+Core 1: 21 => 	add $t2, $t0, $t1; $t2= 10
+
+Cycle 130:
+Core 1: 22 => 	sw $t2, 0($s0); DRAM request issued
+
+Cycle 129-130:
+Core 1: 22 => 	sw $t2, 0($s0); Memory address 1008-1011= 6
+
+Cycle 131:
+Core 1: 23 => 	addi $s1, $s1, 1; $s1= 3
+
+Cycle 132:
+Core 1: 24 => 	slt $s3, $s1, $s2; $s3= 1
+
+Cycle 131-132:
+Core 1: 22 => 	sw $t2, 0($s0); Memory address 1012-1015= 10
+
+Cycle 133:
+Core 1: 25 => 	bne $s3, $zero, sumloop; Jumping to sumloop
+
+Cycle 134:
+Core 1: 18 => 	lw $t0, 0($s0); DRAM request issued
+
+Cycle 135:
+Core 1: 19 => 	addi $s0, $s0, 4; $s0= 1016
+
+Cycle 136:
+Core 1: 20 => 	lw $t1, 0($s0); DRAM request issued
+
+Cycle 133-154:
+Core 1: 8 => 	sw $t1, 0($s0); Memory address 1028-1031= 8
+
+Cycle 155-176:
+Core 1: 18 => 	lw $t0, 0($s0); $t0= 10
+
+Cycle 177-178:
+Core 1: 20 => 	lw $t1, 0($s0); $t1= 5
+
+Cycle 179:
+Core 1: 21 => 	add $t2, $t0, $t1; $t2= 15
+
+Cycle 180:
+Core 1: 22 => 	sw $t2, 0($s0); DRAM request issued
+
+Cycle 181:
+Core 1: 23 => 	addi $s1, $s1, 1; $s1= 4
+
+Cycle 182:
+Core 1: 24 => 	slt $s3, $s1, $s2; $s3= 1
+
+Cycle 183:
+Core 1: 25 => 	bne $s3, $zero, sumloop; Jumping to sumloop
+
+Cycle 184:
+Core 1: 18 => 	lw $t0, 0($s0); $t0= 15; Due to forwarding
+
+Cycle 185:
+Core 1: 19 => 	addi $s0, $s0, 4; $s0= 1020
+
+Cycle 186:
+Core 1: 20 => 	lw $t1, 0($s0); DRAM request issued
+
+Cycle 179-200:
+Core 1: 8 => 	sw $t1, 0($s0); Memory address 1032-1035= 9
+
+Cycle 201-222:
+Core 1: 20 => 	lw $t1, 0($s0); $t1= 6
+
+Cycle 223:
+Core 1: 21 => 	add $t2, $t0, $t1; $t2= 21
+
+Cycle 224:
+Core 1: 22 => 	sw $t2, 0($s0); DRAM request issued
+
+Cycle 223-224:
+Core 1: 22 => 	sw $t2, 0($s0); Memory address 1016-1019= 15
+
+Cycle 225:
+Core 1: 23 => 	addi $s1, $s1, 1; $s1= 5
+
+Cycle 226:
+Core 1: 24 => 	slt $s3, $s1, $s2; $s3= 1
+
+Cycle 225-226:
+Core 1: 22 => 	sw $t2, 0($s0); Memory address 1020-1023= 21
+
+Cycle 227:
+Core 1: 25 => 	bne $s3, $zero, sumloop; Jumping to sumloop
+
+Cycle 228:
+Core 1: 18 => 	lw $t0, 0($s0); DRAM request issued
+
+Cycle 229:
+Core 1: 19 => 	addi $s0, $s0, 4; $s0= 1024
+
+Cycle 230:
+Core 1: 20 => 	lw $t1, 0($s0); DRAM request issued
+
+Cycle 227-248:
+Core 1: 8 => 	sw $t1, 0($s0); Memory address 1036-1039= 10
+
+Cycle 249-270:
+Core 1: 18 => 	lw $t0, 0($s0); $t0= 21
+
+Cycle 271-292:
+Core 1: 20 => 	lw $t1, 0($s0); $t1= 7
+
+Cycle 293:
+Core 1: 21 => 	add $t2, $t0, $t1; $t2= 28
+
+Cycle 294:
+Core 1: 22 => 	sw $t2, 0($s0); DRAM request issued
+
+Cycle 295:
+Core 1: 23 => 	addi $s1, $s1, 1; $s1= 6
+
+Cycle 296:
+Core 1: 24 => 	slt $s3, $s1, $s2; $s3= 1
+
+Cycle 297:
+Core 1: 25 => 	bne $s3, $zero, sumloop; Jumping to sumloop
+
+Cycle 298:
+Core 1: 18 => 	lw $t0, 0($s0); $t0= 28; Due to forwarding
+
+Cycle 299:
+Core 1: 19 => 	addi $s0, $s0, 4; $s0= 1028
+
+Cycle 300:
+Core 1: 20 => 	lw $t1, 0($s0); DRAM request issued
+
+Cycle 293-314:
+Core 2: 7 => sw $t0, 0($s0); Memory address 4000-4003= 1
+
+Cycle 315-336:
+Core 1: 20 => 	lw $t1, 0($s0); $t1= 8
+
+Cycle 337:
+Core 1: 21 => 	add $t2, $t0, $t1; $t2= 36
+
+Cycle 338:
+Core 1: 22 => 	sw $t2, 0($s0); DRAM request issued
+
+Cycle 337-338:
+Core 1: 22 => 	sw $t2, 0($s0); Memory address 1024-1027= 28
+
+Cycle 339:
+Core 1: 23 => 	addi $s1, $s1, 1; $s1= 7
+
+Cycle 340:
+Core 1: 24 => 	slt $s3, $s1, $s2; $s3= 1
+
+Cycle 339-340:
+Core 1: 22 => 	sw $t2, 0($s0); Memory address 1028-1031= 36
+
+Cycle 341:
+Core 1: 25 => 	bne $s3, $zero, sumloop; Jumping to sumloop
+
+Cycle 342:
+Core 1: 18 => 	lw $t0, 0($s0); DRAM request issued
+
+Cycle 343:
+Core 1: 19 => 	addi $s0, $s0, 4; $s0= 1032
+
+Cycle 344:
+Core 1: 20 => 	lw $t1, 0($s0); DRAM request issued
+
+Cycle 341-362:
+Core 2: 11 => lw $t5, 0($s0); $t5= 1
+
+Cycle 363-384:
+Core 1: 18 => 	lw $t0, 0($s0); $t0= 36
+
+Cycle 385-386:
+Core 1: 20 => 	lw $t1, 0($s0); $t1= 9
+
+Cycle 387:
+Core 1: 21 => 	add $t2, $t0, $t1; $t2= 45
+
+Cycle 388:
+Core 1: 22 => 	sw $t2, 0($s0); DRAM request issued
+
+Cycle 389:
+Core 1: 23 => 	addi $s1, $s1, 1; $s1= 8
+
+Cycle 390:
+Core 1: 24 => 	slt $s3, $s1, $s2; $s3= 1
+
+Cycle 391:
+Core 1: 25 => 	bne $s3, $zero, sumloop; Jumping to sumloop
+
+Cycle 392:
+Core 1: 18 => 	lw $t0, 0($s0); $t0= 45; Due to forwarding
+
+Cycle 393:
+Core 1: 19 => 	addi $s0, $s0, 4; $s0= 1036
+
+Cycle 394:
+Core 1: 20 => 	lw $t1, 0($s0); DRAM request issued
+
+Cycle 387-408:
+Core 2: 9 => sw $t2, 4($s0); Memory address 4004-4007= 3
+
+Cycle 409-430:
+Core 1: 20 => 	lw $t1, 0($s0); $t1= 10
+
+Cycle 431:
+Core 1: 21 => 	add $t2, $t0, $t1; $t2= 55
+
+Cycle 432:
+Core 1: 22 => 	sw $t2, 0($s0); DRAM request issued
+
+Cycle 431-432:
+Core 1: 22 => 	sw $t2, 0($s0); Memory address 1032-1035= 45
+
+Cycle 433:
+Core 1: 23 => 	addi $s1, $s1, 1; $s1= 9
+
+Cycle 434:
+Core 1: 24 => 	slt $s3, $s1, $s2; $s3= 0
+
+Cycle 433-434:
+Core 1: 22 => 	sw $t2, 0($s0); Memory address 1036-1039= 55
+
+Cycle 435:
+Core 1: 25 => 	bne $s3, $zero, sumloop; No jump required to sumloop
+
+Cycle 435-456:
+Core 2: 13 => lw $t7, 4($s0); $t7= 3
+
+
+Non-zero values in the memory at the end of the execution:
+
+1000-1003: 1
+1004-1007: 3
+1008-1011: 6
+1012-1015: 10
+1016-1019: 15
+1020-1023: 21
+1024-1027: 28
+1028-1031: 36
+1032-1035: 45
+1036-1039: 55
+2500-2503: 2
+4000-4003: 1
+4004-4007: 3
+
+Non-zero values in registers at the end of execution:
+
+For 1th core:
+$s0: 1036
+$s1: 9
+$s2: 9
+$sp: 2147479548
+$t0: 45
+$t1: 10
+$t2: 55
+
+For 2th core:
+$s0: 4000
+$s1: 2500
+$sp: 2147479548
+$t0: 1
+$t1: 2
+$t2: 3
+$t3: 4
+$t5: 1
+$t6: 2
+$t7: 3
+
+For 3th core:
+$s1: 15
+$s2: 1
+$s3: 120
+$s4: 1
+$sp: 2147479548
+$t0: 1
+
+
+Total number of row buffer updates: 42
+10 extra cycles taken for final writeback.

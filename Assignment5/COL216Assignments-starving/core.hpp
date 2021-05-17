@@ -1,12 +1,9 @@
 #include<bits/stdc++.h>
 using namespace std;
 
-#define MAX_CORE 16
-
 int throwError = 0;
 map <pair<int, int>, map<int,string>> print;
 // [ending cycle][-1 * starting cycle][core] = the string to be printed;
-int totalInstructions =0;
 
 class Core{
 
@@ -22,6 +19,7 @@ class Core{
         int itr=0;
         int counter=0;
         tuple <int, int, int> last_sw= {-1,0,-1};  // {address, value, count}
+        int clockCycles = 1;
         int error=0;
 
         Core();
@@ -38,37 +36,34 @@ class Core{
 int N = 1;	// N cores
 long long MAX_TIME = 2000000000;	// M time to run
 vector<Core*> cores;
+int currentCore = 0;
 
 /*********************** Request Manager *************************/
 
 map<int, map<int, queue<tuple<int, string, int>>>> waitingList;
-//[core][row]= {counter, reg_name/value, col}
+//[row][col]= {counter, reg_name/value, core}
 //value denotes that it was a sw instruction and reg_name(register name) denotes it was an lw instruction
 
-int queueSize[MAX_CORE] = {0};
-const int MAX_SIZE = 32;
-int isReady=0;
-tuple <int, int, int, string, int> command = {-1,-1,-1,"",-1};
+int queueSize = 0;
+const int MAX_SIZE = 64;
 
 /*************************** DRAM *******************************/
 
 vector<vector<int>> DRAM(1024, vector<int>(256, 0)); //because every column in itself represents 4 bytes so the column size is only 256
 vector<int> buffer(256, 0);
-bool dirty = false;
 tuple<string, string, string, string, int, int> store;
 // {sw, clockCycles, address- address+3, value, count, core}
 // {lw, clockCycles, register name, value, count, core}
 
 int DRAMclock=1;
-tuple<string, int, string> just_did ={"", -1, ""};  // {lw/sw/"" is nothing done, core, register}
+pair<bool, int> didlw ={false, 1};  // This will store, whether lw was last performed and also in which core
 int currRow = -1; //row number of current row buffer
-int currCore = -1;  // The core whose DRAM instruction is being executed
-int currCount = 0; // To check when will the core be executed 5 times
 int row_buffer_updates = 0;
 int time_req = -1; // This marks the clock cycle at which the DRAM request will complete
 int row_access_delay = 10;        
 int col_access_delay = 2;
-map<int, int> address_core; // [row] = core in which it was accessed, 0 if never accessed
+map<int, int> address_core; // [address] = core in which it was accessed, 0 if never accessed
+bool just_did = false;  // When we just did a instruction by (time_req == DRAMclock)
 
 /*********************** Helper functions ***********************/
 void initialize(int argc, char** argv);
@@ -245,9 +240,7 @@ void print_stats()
         if (start == end) cout <<"Cycle "<<start<<":\n";
         else cout <<"Cycle "<<start<<"-"<<end<<":\n";
         for (auto u : p.second){
-            if (u.first !=-1) cout <<"Core "<< u.first+1<<": ";
-            else cout <<"MRM: ";
-            cout <<u.second;
+            cout <<"Core "<< u.first+1<<": "<<u.second;
         }
         cout <<"\n";
     }
@@ -280,11 +273,8 @@ void print_stats()
     }
 
     cout << "\nTotal number of row buffer updates: " << row_buffer_updates << "\n";
-    if (currRow != -1 && dirty)
-		cout << row_access_delay << " extra cycles taken for final writeback.\n\n";
-
-    cout <<"Total instructions executed: "<< totalInstructions<<"\n";
-    cout <<"Throughput: "<< ( (double) totalInstructions)/MAX_TIME<<"\n";
+    if (currRow != -1)
+		cout << row_access_delay << " extra cycles taken for final writeback.\n";
 }
 
 void initialize_short(int N, string folder){
@@ -470,7 +460,7 @@ bool checkAddress(string reg)
     int n = reg.length();
     Core dummy = Core();
     if (check_number(reg))
-        return true;
+        return false;
 
     if (n >= 7 && reg.substr(n - 7) == "($zero)")
     {
