@@ -1,5 +1,4 @@
 // TODO: Making the Priority encoder is left
-// TODO: Minorr bug is there in scrapping
 
 #include<bits/stdc++.h>
 #include "core.hpp"
@@ -14,7 +13,6 @@ void runMRM(){
 	}
 	int row = currRow;
 
-	// TODO: we need to change the row such that we are going to run command for some other core, basically improving the MRM is left
 	if (waitingList.find(currRow)== waitingList.end()) row = (*waitingList.begin()).first;
 
 	int col = (*waitingList[row].begin()).first;
@@ -41,8 +39,8 @@ void runMRM(){
 	}
 	else{
 		isReady=1;
-		if (make_tuple(row, col, count, reg, i) != command){
-			buffercout <<" would be sent next\n";
+		if (time_req == DRAMclock || time_req==-1){
+			buffercout <<" is sent to DRAM\n";
 			print[{DRAMclock, -1*DRAMclock}][-1] = buffercout.str();
 		}
 		command = {row, col, count, reg, i};
@@ -87,7 +85,7 @@ void processCommand(tuple <int, int, int, string, int> command){
 	else{
 		// means this is a lw operation
 		cores[i]->registers[reg] = buffer[col];
-		cores[i]->registerUpdate.erase(reg);
+		if (cores[i]->registerUpdate[reg].first == count) cores[i]->registerUpdate.erase(reg);
 		time_req+= col_access_delay;
 		store  = {"lw", to_string(DRAMclock), reg, to_string(buffer[col]), count, i};
 	}
@@ -346,6 +344,8 @@ int main(int argc, char** argv){
 	while(DRAMclock <= MAX_TIME){
 
 		if (time_req==-1 && isReady) processCommand(command);
+
+		runMRM();
 		
 		just_did = {"", -1, ""};
         if (time_req == DRAMclock){
@@ -354,8 +354,6 @@ int main(int argc, char** argv){
 			get<2>(just_did) = get<2>(store);
             processCompletion();
         }
-
-		runMRM();
 
 		for (int i=0;i<N;i++){
 			if (cores[i]->error==0 && cores[i]->itr < cores[i]->instructions.size()) parser(lexer(cores[i]->instructions[cores[i]->itr]), i);
